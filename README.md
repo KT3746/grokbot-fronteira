@@ -33,7 +33,7 @@ Interface **somente em português (PT-BR)**.
 
 ## Técnico
 
-Site estático na raiz do repositório (GitHub Pages). Vanilla JS + Canvas 2D + Web Audio API. Sem build, sem npm.
+Site estático na raiz do repositório (GitHub Pages). **Three.js** (CDN) + WebGL baixo-poli em 3ª pessoa + Web Audio API. Sem build, sem npm.
 
 ```
 index.html
@@ -42,7 +42,7 @@ js/audio.js  world.js  input.js  ui.js  game.js  main.js
 .nojekyll
 ```
 
-Câmera em **terceira pessoa** (atrás do personagem, olhando a rua) com render **baixo-poli** em perspectiva Canvas 2D — sertão ocre, névoa no horizonte, sombras duras. Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
+Câmera em **terceira pessoa** (chase cam) com **Three.js / WebGL** baixo-poli: rua de asfalto em canyon, prédios com grade de janelas, névoa sépia, sombras duras. Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
 
 Jogo **original** — sem personagens ou marcas licenciadas.
 

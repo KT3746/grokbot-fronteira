@@ -1,26 +1,29 @@
-/* FRONTEIRA — 3ª pessoa baixo-poli (perspectiva Canvas 2D) */
+/* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) */
 const FronteiraGame = (() => {
-  const PLAYER_R = 11;
-  const SPEED = 125;
-  const TURN_SPEED = 3.2;
-  const CAM_DIST = 62;
-  const CAM_HEIGHT = 36;
-  const LOOK_AHEAD = 55;
-  const FOCAL = 320;
-  const NEAR = 8;
-  const FOG_START = 120;
-  const FOG_END = 520;
-  const FOG = { r: 196, g: 168, b: 120 }; // dusty sepia haze
-  const SUN = { x: 0.55, y: -0.15, z: 0.35 }; // world dir for hard shadows
+  const PLAYER_R = 0.55;
+  const SPEED = 9.5;
+  const TURN = 4.2;
+  const CAM_DIST = 7.5;
+  const CAM_HEIGHT = 3.4;
+  const LOOK_AHEAD = 10;
+  const FOG_COLOR = 0xb8a070;
 
-  let canvas, ctx;
+  let canvas, renderer, scene, camera, sun, clock;
+  let playerRoot, playerMeshes;
+  let npcRoots = {};
+  let markerRoots = {};
   let running = false, paused = false, won = false;
-  let lastT = 0, bobT = 0;
   let state = null, near = null;
-  let reducedMotion = false;
   let zoneName = '', zoneFade = 0;
-  let player = { x: 0, y: 0, ang: 0, moving: false };
-  let cam = { x: 0, y: CAM_HEIGHT, z: 0, yaw: 0 };
+  let reducedMotion = false;
+  let shadowsOn = true;
+  let player = { x: 0, z: 0, ang: 0, moving: false };
+  let camPos = new THREE.Vector3();
+  let lookPos = new THREE.Vector3();
+  let _tmp = new THREE.Vector3();
+  let windowTex = null;
+  let roadMat, dirtMat, asphaltMat;
+  let wagonGroup;
 
   function freshState() {
     return {
@@ -31,22 +34,6 @@ const FronteiraGame = (() => {
       },
       questDone: { entrega: false, ferradura: false, agua: false },
     };
-  }
-
-  function spawn() {
-    const { TILE } = FronteiraWorld;
-    player.x = 21 * TILE;
-    player.y = 18 * TILE;
-    player.ang = Math.PI; // face toward capela (north = -Y)
-    player.moving = false;
-    FronteiraWorld.resetItems();
-    state = freshState();
-    won = false;
-    near = null;
-    bobT = 0;
-    zoneName = '';
-    zoneFade = 0;
-    syncCam(1);
   }
 
   function objectiveText() {
@@ -102,7 +89,7 @@ const FronteiraGame = (() => {
         lines.push(...npc.lines.quest_give);
         after = () => { f.talkedZe = true; f.hasPackage = true; FronteiraUI.setObjective(objectiveText()); };
       } else if (f.deliveredPackage) lines.push(...npc.lines.after);
-      else if (f.hasPackage) lines.push('Ainda com o embrulho? A cantina fica a leste da praça.');
+      else if (f.hasPackage) lines.push('Ainda com o embrulho? A cantina fica adiante à direita.');
       else lines.push(...npc.lines.idle);
     } else if (npc.id === 'dona_clara') {
       if (f.hasPackage && !f.deliveredPackage) {
@@ -131,7 +118,7 @@ const FronteiraGame = (() => {
         after = () => { f.talkedRita = true; FronteiraUI.setObjective(objectiveText()); };
       } else if (f.deliveredWater) { lines.push(...npc.lines.thanks); lines.push(...npc.lines.after); }
       else if (f.hasWater) lines.push(...npc.lines.got_water);
-      else lines.push('O poço fica bem no meio da praça. Enche o balde aí.');
+      else lines.push('O poço fica no meio da praça, na rua. Enche o balde aí.');
     } else lines.push('…');
     FronteiraAudio.interactChime();
     FronteiraUI.showDialog(npc.name, lines, after);
@@ -167,6 +154,7 @@ const FronteiraGame = (() => {
         return;
       }
       spot.collected = true; f.hasHorseshoe = true;
+      if (markerRoots.ferradura) markerRoots.ferradura.visible = false;
       FronteiraAudio.interactChime();
       FronteiraUI.showDialog('Ferradura', ['Você achou a ferradura perdida do Tião.'],
         () => FronteiraUI.setObjective(objectiveText()));
@@ -191,26 +179,23 @@ const FronteiraGame = (() => {
     const mag = Math.hypot(m.x, m.y);
     player.moving = mag > 0.05;
     if (!player.moving) return;
-
-    // Camera-relative wish: up = forward along facing, left/right = strafe
+    // camera-relative: up = forward along facing
     const s = Math.sin(player.ang), c = Math.cos(player.ang);
-    // input y: -1 = up = forward
     const wishX = (-m.y) * s + m.x * c;
-    const wishY = (-m.y) * c - m.x * s;
-    const target = Math.atan2(wishX, wishY);
-    player.ang = angLerp(player.ang, target, Math.min(1, TURN_SPEED * dt));
-
+    const wishZ = (-m.y) * c - m.x * s;
+    const target = Math.atan2(wishX, wishZ);
+    player.ang = angLerp(player.ang, target, Math.min(1, TURN * dt));
     const dist = SPEED * dt;
     const nx = player.x + wishX * dist;
-    const ny = player.y + wishY * dist;
-    const box = (x, y) => ({ x: x - PLAYER_R, y: y - PLAYER_R + 2, w: PLAYER_R * 2, h: PLAYER_R * 2 - 2 });
-    if (!FronteiraWorld.collides(box(nx, player.y))) player.x = nx;
-    if (!FronteiraWorld.collides(box(player.x, ny))) player.y = ny;
+    const nz = player.z + wishZ * dist;
+    const box = (x, z) => ({ x: x - PLAYER_R, z: z - PLAYER_R, w: PLAYER_R * 2, d: PLAYER_R * 2 });
+    if (!FronteiraWorld.collides(box(nx, player.z))) player.x = nx;
+    if (!FronteiraWorld.collides(box(player.x, nz))) player.z = nz;
     FronteiraAudio.footstep();
   }
 
   function updateNear() {
-    near = FronteiraWorld.nearInteract(player.x, player.y, 36);
+    near = FronteiraWorld.nearInteract(player.x, player.z, 2.2);
     let hint = '';
     if (near) {
       if (near.type === 'npc') hint = near.ref.name + ' — Interagir';
@@ -221,436 +206,361 @@ const FronteiraGame = (() => {
   }
 
   function updateZone(dt) {
-    const { TILE } = FronteiraWorld;
-    const tx = player.x / TILE, ty = player.y / TILE;
-    let z = 'Povoado';
-    if (tx >= 16 && tx <= 24 && ty >= 12 && ty <= 18) z = 'Praça';
-    else if (tx >= 4 && tx <= 12 && ty >= 10 && ty <= 17) z = 'Armazém';
-    else if (tx >= 28 && tx <= 38 && ty >= 10 && ty <= 17) z = 'Cantina';
-    else if (tx >= 5 && tx <= 15 && ty >= 20 && ty <= 28) z = 'Estábulo';
-    else if (tx >= 16 && tx <= 26 && ty >= 3 && ty <= 9) z = 'Capela';
-    else if (ty > 26 || tx < 4 || tx > 38) z = 'Beira do mato';
-    if (z !== zoneName) { zoneName = z; zoneFade = 1.8; }
+    const z = FronteiraWorld.zoneAt(player.x, player.z);
+    if (z !== zoneName) { zoneName = z; zoneFade = 1.6; }
     else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
   }
 
-  function syncCam(snap) {
-    const s = Math.sin(player.ang), c = Math.cos(player.ang);
-    const tx = player.x - s * CAM_DIST;
-    const tz = player.y - c * CAM_DIST;
-    const ty = CAM_HEIGHT;
-    if (snap >= 1) {
-      cam.x = tx; cam.z = tz; cam.y = ty; cam.yaw = player.ang;
-    } else {
-      const k = Math.min(1, snap);
-      cam.x += (tx - cam.x) * k;
-      cam.z += (tz - cam.z) * k;
-      cam.y += (ty - cam.y) * k;
-      cam.yaw = angLerp(cam.yaw, player.ang, k);
-    }
-  }
-
-  /* ——— perspective ——— */
-  function project(wx, wy, wz) {
-    // world: x, height wy, depth wz (= map y)
-    const dx = wx - cam.x;
-    const dy = wy - cam.y;
-    const dz = wz - cam.z;
-    const s = Math.sin(cam.yaw), c = Math.cos(cam.yaw);
-    // camera space: +X right, +Y up, +Z forward
-    const rx = dx * c - dz * s;
-    const rz = dx * s + dz * c;
-    const ry = dy;
-    if (rz <= NEAR) return null;
-    const sc = FOCAL / rz;
-    const vw = canvas.width, vh = canvas.height;
-    return {
-      x: vw * 0.5 + rx * sc,
-      y: vh * 0.52 - ry * sc, // horizon slightly above center
-      z: rz,
-      sc,
-    };
-  }
-
-  function fogAlpha(z) {
-    if (z <= FOG_START) return 0;
-    if (z >= FOG_END) return 1;
-    return (z - FOG_START) / (FOG_END - FOG_START);
-  }
-
-  function shadeColor(hex, face, fog) {
-    // face: 0 top, 1 sun-lit side, 2 front, 3 shade side
-    const mul = face === 0 ? 1.08 : face === 1 ? 1.0 : face === 2 ? 0.78 : 0.55;
-    const n = parseInt(hex.slice(1), 16);
-    let r = ((n >> 16) & 255) * mul;
-    let g = ((n >> 8) & 255) * mul;
-    let b = (n & 255) * mul;
-    r = r + (FOG.r - r) * fog;
-    g = g + (FOG.g - g) * fog;
-    b = b + (FOG.b - b) * fog;
-    return `rgb(${r|0},${g|0},${b|0})`;
-  }
-
-  function fillPoly(pts, color) {
-    if (pts.length < 3) return;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
-  function avgZ(pts) {
-    let s = 0, n = 0;
-    for (const p of pts) { if (p) { s += p.z; n++; } }
-    return n ? s / n : 1e9;
-  }
-
-  /* ——— ground (perspective strips) ——— */
-  function drawSky() {
-    const vw = canvas.width, vh = canvas.height;
-    const g = ctx.createLinearGradient(0, 0, 0, vh * 0.55);
-    g.addColorStop(0, '#c4a878');
-    g.addColorStop(0.55, '#b89868');
-    g.addColorStop(1, '#a88858');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, vw, vh);
-  }
-
-  function drawGroundPlane() {
-    const { TILE, ground, W, H } = FronteiraWorld;
-    // Sample ground quads in a window around player for performance
-    const reach = 18;
-    const cx = Math.floor(player.x / TILE);
-    const cy = Math.floor(player.y / TILE);
-    const faces = [];
-
-    for (let ty = cy - reach; ty <= cy + reach; ty++) {
-      for (let tx = cx - reach; tx <= cx + reach; tx++) {
-        if (ty < 0 || tx < 0 || ty >= H || tx >= W) continue;
-        const t = ground[ty][tx];
-        let col = '#8a6a48';
-        if (t === 1) col = '#a88860';
-        else if (t === 2) col = '#5a6840';
-        else if (t === 3) col = '#3a5058';
-        else if (t === 4) col = '#6a5a48';
-
-        const x0 = tx * TILE, z0 = ty * TILE;
-        const x1 = x0 + TILE, z1 = z0 + TILE;
-        const p00 = project(x0, 0, z0);
-        const p10 = project(x1, 0, z0);
-        const p11 = project(x1, 0, z1);
-        const p01 = project(x0, 0, z1);
-        if (!p00 || !p10 || !p11 || !p01) continue;
-        const z = (p00.z + p10.z + p11.z + p01.z) * 0.25;
-        if (z > FOG_END) continue;
-        const fog = fogAlpha(z);
-        faces.push({
-          z,
-          pts: [p00, p10, p11, p01],
-          color: shadeColor(col, 0, fog * 0.85),
-          road: t === 4,
-          x0, z0,
-        });
+  /* ——— textures ——— */
+  function makeWindowTexture(baseHex, litChance) {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const g = c.getContext('2d');
+    const r = (baseHex >> 16) & 255, gg = (baseHex >> 8) & 255, b = baseHex & 255;
+    g.fillStyle = `rgb(${r},${gg},${b})`;
+    g.fillRect(0, 0, 128, 256);
+    const cols = 4, rows = 8;
+    const mw = 18, mh = 22;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const lit = Math.random() < (litChance || 0.12);
+        g.fillStyle = lit ? '#c4a040' : '#1a120c';
+        const x = 10 + col * 28;
+        const y = 12 + row * 30;
+        g.fillRect(x, y, mw, mh);
       }
     }
-    faces.sort((a, b) => b.z - a.z);
-    for (const f of faces) {
-      fillPoly(f.pts, f.color);
-      if (f.road) {
-        // dashed center line when roughly aligned
-        const mid = project(f.x0 + TILE * 0.5, 0.5, f.z0 + TILE * 0.5);
-        if (mid && ((f.x0 / TILE) | 0) % 2 === 0) {
-          const a = project(f.x0 + TILE * 0.45, 0.4, f.z0 + 4);
-          const b = project(f.x0 + TILE * 0.55, 0.4, f.z0 + TILE - 4);
-          if (a && b && fogAlpha(mid.z) < 0.7) {
-            ctx.strokeStyle = `rgba(210,190,150,${0.45 * (1 - fogAlpha(mid.z))})`;
-            ctx.lineWidth = Math.max(1, mid.sc * 0.8);
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
-          }
-        }
-      }
-    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   }
 
-  /* ——— boxes ——— */
-  function boxFaces(x, y0, z, w, h, d, color, opts) {
+  function makeRoadTexture() {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#3a3a3c';
+    g.fillRect(0, 0, 128, 512);
+    // yellow edges
+    g.fillStyle = '#c4a020';
+    g.fillRect(4, 0, 6, 512);
+    g.fillRect(118, 0, 6, 512);
+    // white dashed center
+    g.fillStyle = '#e8e8e0';
+    for (let y = 0; y < 512; y += 48) {
+      g.fillRect(58, y + 8, 12, 28);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 12);
+    tex.magFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function matColor(hex, opts) {
     opts = opts || {};
-    const out = [];
-    // 8 corners
-    const corners = [
-      [x, y0, z], [x + w, y0, z], [x + w, y0, z + d], [x, y0, z + d],
-      [x, y0 + h, z], [x + w, y0 + h, z], [x + w, y0 + h, z + d], [x, y0 + h, z + d],
-    ];
-    const P = corners.map((c) => project(c[0], c[1], c[2]));
-    const faces = [
-      { idx: [4, 5, 6, 7], face: 0 }, // top
-      { idx: [0, 1, 5, 4], face: 2 }, // -Z
-      { idx: [3, 2, 6, 7], face: 2 }, // +Z
-      { idx: [0, 3, 7, 4], face: 3 }, // -X
-      { idx: [1, 2, 6, 5], face: 1 }, // +X sunnier
-    ];
-    // choose lit side by sun
-    for (const f of faces) {
-      const pts = f.idx.map((i) => P[i]);
-      if (pts.some((p) => !p)) continue;
-      // backface: skip if average screen cross roughly wrong — simple: use cam-space normal via z of center
-      const zAvg = avgZ(pts);
-      const fog = fogAlpha(zAvg);
-      let face = f.face;
-      // sun bias: +X more lit
-      if (f.idx[0] === 1) face = 1;
-      if (f.idx[0] === 0 && f.idx[1] === 3) face = 3;
-      out.push({
-        z: zAvg,
-        pts,
-        color: shadeColor(color, face, fog),
-        kind: 'box',
-      });
-    }
-
-    // hard ground shadow (flat projected parallelogram)
-    if (!opts.noShadow) {
-      const sx = SUN.x * 40, sz = SUN.z * 40;
-      const sc = [
-        [x + sx, 0.2, z + sz],
-        [x + w + sx, 0.2, z + sz],
-        [x + w + sx, 0.2, z + d + sz],
-        [x + sx, 0.2, z + d + sz],
-      ].map((c) => project(c[0], c[1], c[2]));
-      if (!sc.some((p) => !p)) {
-        const zAvg = avgZ(sc) + 0.5;
-        const fog = fogAlpha(zAvg);
-        const a = 0.45 * (1 - fog * 0.7);
-        out.push({
-          z: zAvg + 0.01,
-          pts: sc,
-          color: `rgba(15,8,4,${a})`,
-          kind: 'shadow',
-        });
-      }
-    }
-    return out;
+    return new THREE.MeshLambertMaterial({
+      color: hex,
+      flatShading: true,
+      map: opts.map || null,
+      transparent: !!opts.transparent,
+      opacity: opts.opacity != null ? opts.opacity : 1,
+    });
   }
 
-  function windowGrid(x, y0, z, w, h, d, color) {
-    // paint dark window rects on the camera-facing wall (approximate: both long faces)
-    const faces = [];
-    const cols = Math.max(2, Math.floor(w / 28));
-    const rows = Math.max(2, Math.floor(h / 32));
-    const inset = 10;
-    // front (+Z) and -Z walls
-    for (const side of [0, 1]) {
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const wx = x + inset + col * ((w - inset * 2) / cols) + 4;
-          const wy = y0 + inset + row * ((h - inset * 2) / rows) + 4;
-          const ww = Math.max(6, (w - inset * 2) / cols - 10);
-          const wh = Math.max(8, (h - inset * 2) / rows - 10);
-          const zz = side === 0 ? z + d + 0.5 : z - 0.5;
-          const p0 = project(wx, wy, zz);
-          const p1 = project(wx + ww, wy, zz);
-          const p2 = project(wx + ww, wy + wh, zz);
-          const p3 = project(wx, wy + wh, zz);
-          if (!p0 || !p1 || !p2 || !p3) continue;
-          const zAvg = avgZ([p0, p1, p2, p3]);
-          const fog = fogAlpha(zAvg);
-          faces.push({
-            z: zAvg - 0.2,
-            pts: [p0, p1, p2, p3],
-            color: shadeColor('#1a120c', 3, fog),
-            kind: 'win',
-          });
-        }
-      }
-    }
-    return faces;
+  function boxMesh(w, h, d, material, cast, receive) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+    m.castShadow = !!cast;
+    m.receiveShadow = !!receive;
+    return m;
   }
 
-  function signSlab(cx, y, cz, text, color) {
-    const w = Math.min(70, text.length * 8 + 16);
-    const h = 14, d = 4;
-    const faces = boxFaces(cx - w / 2, y, cz, w, h, d, color || '#3a2a1c', { noShadow: true });
-    return faces;
+  function makePerson(palette) {
+    const g = new THREE.Group();
+    const pants = matColor(palette.pants);
+    const torso = matColor(palette.torso);
+    const head = matColor(palette.head);
+    const hat = matColor(palette.hat);
+    const legL = boxMesh(0.35, 0.85, 0.35, pants, true, false);
+    legL.position.set(-0.2, 0.425, 0);
+    const legR = boxMesh(0.35, 0.85, 0.35, pants, true, false);
+    legR.position.set(0.2, 0.425, 0);
+    const body = boxMesh(0.85, 0.95, 0.5, torso, true, false);
+    body.position.set(0, 1.25, 0);
+    const hd = boxMesh(0.45, 0.45, 0.45, head, true, false);
+    hd.position.set(0, 1.95, 0);
+    const brim = boxMesh(0.85, 0.1, 0.75, hat, true, false);
+    brim.position.set(0, 2.18, 0);
+    const crown = boxMesh(0.5, 0.28, 0.5, hat, true, false);
+    crown.position.set(0, 2.35, 0);
+    g.add(legL, legR, body, hd, brim, crown);
+    g.userData.legs = [legL, legR];
+    return g;
   }
 
-  function drawLowPolyPerson(wx, wz, ang, palette, isPlayer) {
-    const faces = [];
-    const s = Math.sin(ang), c = Math.cos(ang);
-    // local offsets → world
-    function lp(lx, ly, lz) {
-      return {
-        x: wx + lx * c + lz * s,
-        y: ly,
-        z: wz - lx * s + lz * c,
-      };
-    }
-    const parts = [
-      // legs
-      { o: lp(-4, 0, -2), w: 5, h: 14, d: 5, col: palette.pants },
-      { o: lp(2, 0, -2), w: 5, h: 14, d: 5, col: palette.pants },
-      // torso
-      { o: lp(-7, 14, -4), w: 14, h: 16, d: 8, col: palette.torso },
-      // head
-      { o: lp(-4.5, 30, -3.5), w: 9, h: 9, d: 8, col: palette.head },
-      // hat brim
-      { o: lp(-8, 38, -6), w: 16, h: 2, d: 14, col: palette.hat },
-      // hat crown
-      { o: lp(-5, 40, -4), w: 10, h: 5, d: 9, col: palette.hat },
-    ];
-    for (const p of parts) {
-      faces.push(...boxFaces(p.o.x, p.o.y, p.o.z, p.w, p.h, p.d, p.col, { noShadow: !isPlayer }));
-    }
-    // player gets one hard shadow under feet
-    if (isPlayer) {
-      faces.push(...boxFaces(wx - 10, 0.1, wz - 8, 20, 0.2, 16, '#1a1008', { noShadow: true }).map((f) => {
-        f.color = 'rgba(10,6,2,0.4)';
-        f.z += 0.5;
-        return f;
-      }));
-    }
-    return faces;
+  function makeWagon() {
+    const g = new THREE.Group();
+    const wood = matColor(0x5c3d2e);
+    const dark = matColor(0x2a1c14);
+    const bed = boxMesh(2.2, 0.8, 3.4, wood, true, true);
+    bed.position.y = 0.9;
+    const rail = boxMesh(2.3, 0.5, 0.15, dark, true, false);
+    rail.position.set(0, 1.5, 1.6);
+    const rail2 = rail.clone(); rail2.position.z = -1.6;
+    const wheel = (x, z) => {
+      const w = boxMesh(0.25, 0.9, 0.9, dark, true, false);
+      w.position.set(x, 0.45, z);
+      return w;
+    };
+    g.add(bed, rail, rail2, wheel(-1.1, 1.1), wheel(1.1, 1.1), wheel(-1.1, -1.1), wheel(1.1, -1.1));
+    return g;
   }
 
-  function gatherScene() {
-    const faces = [];
+  function addBuilding(x, z, w, d, h, color, style) {
+    const group = new THREE.Group();
+    const tex = makeWindowTexture(color, style === 'capela' ? 0.05 : 0.14);
+    tex.repeat.set(Math.max(1, w / 8), Math.max(1, h / 10));
+    const wallMat = matColor(color, { map: tex });
+    const plain = matColor(color);
+    const topMat = matColor(0x3d2a1f);
+    // Box materials: +x -x +y -y +z -z
+    const mats = [wallMat, wallMat, topMat, plain, wallMat, wallMat];
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.position.set(x + w / 2, h / 2, z + d / 2);
+    const roof = boxMesh(w + 0.4, 0.35, d + 0.4, topMat, true, false);
+    roof.position.set(x + w / 2, h + 0.15, z + d / 2);
+    group.add(mesh, roof);
 
-    // buildings
+    if (style === 'capela') {
+      const crossV = boxMesh(0.35, 3.2, 0.35, matColor(0x2a2218), true, false);
+      crossV.position.set(x + w / 2, h + 2.2, z + d / 2);
+      const crossH = boxMesh(2.2, 0.35, 0.35, matColor(0x2a2218), true, false);
+      crossH.position.set(x + w / 2, h + 3.2, z + d / 2);
+      group.add(crossV, crossH);
+    }
+    if (style === 'cantina' || style === 'armazem' || style === 'estabulo') {
+      const sign = boxMesh(Math.min(6, w * 0.6), 1.0, 0.2, matColor(0x3a2418), true, false);
+      sign.position.set(x + w / 2, h * 0.55, z + d + 0.2);
+      group.add(sign);
+    }
+    scene.add(group);
+    return group;
+  }
+
+  function buildWorld() {
+    // dirt/ochre ground plane
+    dirtMat = matColor(0x9a7a52);
+    const dirt = new THREE.Mesh(new THREE.PlaneGeometry(200, 280), dirtMat);
+    dirt.rotation.x = -Math.PI / 2;
+    dirt.position.set(0, 0, 70);
+    dirt.receiveShadow = true;
+    scene.add(dirt);
+
+    // sidewalks
+    const walkMat = matColor(0x8a8070);
+    const walkL = new THREE.Mesh(new THREE.PlaneGeometry(4, 220), walkMat);
+    walkL.rotation.x = -Math.PI / 2;
+    walkL.position.set(-(FronteiraWorld.ROAD_HALF + 2), 0.02, 70);
+    walkL.receiveShadow = true;
+    const walkR = walkL.clone();
+    walkR.position.x = FronteiraWorld.ROAD_HALF + 2;
+    scene.add(walkL, walkR);
+
+    // asphalt road with dashed lines
+    const roadTex = makeRoadTexture();
+    asphaltMat = new THREE.MeshLambertMaterial({ map: roadTex, flatShading: true });
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(FronteiraWorld.ROAD_HALF * 2, 220), asphaltMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(0, 0.04, 70);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // canyon fillers
+    for (const b of FronteiraWorld.canyon) {
+      addBuilding(b.x, b.z, b.w, b.d, b.h, b.color, 'canyon');
+    }
+    // named landmarks
     for (const s of FronteiraWorld.solids) {
-      if (!s.label || s.label.startsWith('cerca') || s.label.startsWith('poco')) continue;
-      const h = s.height3d || 100;
-      const col = s.color || '#8a6a48';
-      faces.push(...boxFaces(s.x, 0, s.y, s.w, h, s.h, col));
-      faces.push(...windowGrid(s.x, 0, s.y, s.w, h, s.h, col));
-
-      // distinct sign slabs
-      const style = s.style || s.label;
-      const cx = s.x + s.w / 2;
-      const cz = s.y + s.h + 2;
-      if (style === 'cantina') faces.push(...signSlab(cx, h * 0.55, cz, 'CANTINA', '#3a2418'));
-      if (style === 'armazem') faces.push(...signSlab(cx, h * 0.55, cz, 'ARMAZEM', '#2a1c10'));
-      if (style === 'capela') {
-        // simple cross on top
-        faces.push(...boxFaces(cx - 2, h, s.y + s.h / 2 - 2, 4, 28, 4, '#2a2218', { noShadow: true }));
-        faces.push(...boxFaces(cx - 10, h + 16, s.y + s.h / 2 - 2, 20, 4, 4, '#2a2218', { noShadow: true }));
-      }
-      if (style === 'estabulo') faces.push(...signSlab(cx, h * 0.5, cz, 'ESTABULO', '#3a3020'));
-    }
-
-    // fences as thin boxes
-    for (const s of FronteiraWorld.solids) {
-      if (!s.label || !s.label.startsWith('cerca')) continue;
-      faces.push(...boxFaces(s.x, 0, s.y, Math.max(4, s.w), 18, Math.max(4, s.h), '#4a3828'));
+      if (s.style === 'canyon' || s.style === 'poco') continue;
+      addBuilding(s.x, s.z, s.w, s.d, s.h, s.color, s.style);
     }
 
     // well
-    {
-      const { TILE } = FronteiraWorld;
-      const cx = 20.5 * TILE, cz = 14.8 * TILE;
-      faces.push(...boxFaces(cx - 18, 0, cz - 18, 36, 22, 36, '#6a6860'));
-      faces.push(...boxFaces(cx - 12, 22, cz - 12, 24, 2, 24, '#3a5058', { noShadow: true }));
-      faces.push(...boxFaces(cx - 16, 22, cz - 2, 4, 28, 4, '#3a2a1c', { noShadow: true }));
-      faces.push(...boxFaces(cx + 12, 22, cz - 2, 4, 28, 4, '#3a2a1c', { noShadow: true }));
-      faces.push(...boxFaces(cx - 16, 48, cz - 2, 32, 4, 4, '#2a1c14', { noShadow: true }));
+    const well = new THREE.Group();
+    const stone = matColor(0x6a6860);
+    const base = boxMesh(5.5, 1.6, 5.5, stone, true, true);
+    base.position.y = 0.8;
+    const water = boxMesh(3.5, 0.2, 3.5, matColor(0x2a4550), false, false);
+    water.position.y = 1.5;
+    const postL = boxMesh(0.3, 2.4, 0.3, matColor(0x3a2a1c), true, false);
+    postL.position.set(-2, 2.4, 0);
+    const postR = postL.clone(); postR.position.x = 2;
+    const bar = boxMesh(4.4, 0.25, 0.25, matColor(0x2a1c14), true, false);
+    bar.position.y = 3.5;
+    well.add(base, water, postL, postR, bar);
+    well.position.set(0, 0, 81);
+    scene.add(well);
+
+    // wagons (frontier stand-in for cars)
+    wagonGroup = makeWagon();
+    wagonGroup.position.set(5.5, 0, 40);
+    wagonGroup.rotation.y = Math.PI * 0.5;
+    scene.add(wagonGroup);
+    const wagon2 = makeWagon();
+    wagon2.position.set(-5.2, 0, 100);
+    wagon2.rotation.y = -0.2;
+    scene.add(wagon2);
+
+    // scrub cones at south edge
+    for (let i = 0; i < 12; i++) {
+      const trunk = boxMesh(0.4, 1.2, 0.4, matColor(0x4a3828), true, false);
+      const leaf = boxMesh(1.6, 1.8, 1.6, matColor(0x4a6a38), true, false);
+      leaf.position.y = 1.8;
+      const g = new THREE.Group();
+      g.add(trunk, leaf);
+      g.position.set(-20 + (i % 6) * 8, 0, -22 - ((i / 6) | 0) * 6);
+      scene.add(g);
     }
 
-    // scrub trees (cone+trunk) near mato
-    const { TILE, W, H, ground } = FronteiraWorld;
-    const cx = Math.floor(player.x / TILE), cy = Math.floor(player.y / TILE);
-    for (let ty = cy - 14; ty <= cy + 14; ty++) {
-      for (let tx = cx - 14; tx <= cx + 14; tx++) {
-        if (ty < 0 || tx < 0 || ty >= H || tx >= W) continue;
-        if (ground[ty][tx] !== 2) continue;
-        if ((tx * 13 + ty * 7) % 11 !== 0) continue;
-        const x = tx * TILE + 10, z = ty * TILE + 10;
-        faces.push(...boxFaces(x + 4, 0, z + 4, 6, 16, 6, '#4a3828', { noShadow: true }));
-        // green block as foliage (cone approximated as stacked boxes)
-        faces.push(...boxFaces(x, 14, z, 14, 18, 14, '#4a6a38'));
-        faces.push(...boxFaces(x + 2, 30, z + 2, 10, 10, 10, '#3a5a2e', { noShadow: true }));
-      }
-    }
-
-    // horseshoe marker
-    for (const it of FronteiraWorld.interactables) {
-      if (it.kind !== 'item' || it.collected) continue;
-      faces.push(...boxFaces(it.x, 0, it.y, 14, 4, 14, '#a88858'));
-      // mission beam
-      faces.push(...boxFaces(it.x + 4, 0, it.y + 4, 6, 70, 6, '#c4a050', { noShadow: true }).map((f) => {
-        f.color = 'rgba(210,170,70,0.28)';
-        return f;
-      }));
-    }
-
-    // interact beam near objective NPCs lightly — skip to avoid GTA vibe spam
+    // horseshoe marker + beam
+    const hs = new THREE.Group();
+    const shoe = boxMesh(1.2, 0.25, 1.2, matColor(0xa88858), true, false);
+    shoe.position.y = 0.2;
+    const beam = boxMesh(0.6, 8, 0.6, matColor(0xc4a040, { transparent: true, opacity: 0.28 }), false, false);
+    beam.position.y = 4;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.2, 1.6, 16),
+      new THREE.MeshBasicMaterial({ color: 0xc4a040, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    hs.add(shoe, beam, ring);
+    const fit = FronteiraWorld.interactables.find((i) => i.id === 'ferradura');
+    hs.position.set(fit.x + 1.5, 0, fit.z + 1.5);
+    scene.add(hs);
+    markerRoots.ferradura = hs;
 
     // NPCs
     for (const n of FronteiraWorld.npcs) {
-      const pal = {
-        torso: n.shirt || n.color || '#6a5038',
-        pants: n.pants || '#2e2a24',
-        head: n.skin || '#b89570',
-        hat: n.hat || '#2a2218',
-      };
-      // face toward player roughly
-      const ang = Math.atan2(player.x - n.x, player.y - n.y);
-      faces.push(...drawLowPolyPerson(n.x, n.y, ang, pal, false));
+      const root = makePerson({
+        torso: n.shirt, pants: n.pants, head: n.skin, hat: n.hat,
+      });
+      root.position.set(n.x, 0, n.z);
+      scene.add(root);
+      npcRoots[n.id] = root;
     }
 
-    // Player — behind cam so appears lower-center
-    faces.push(...drawLowPolyPerson(player.x, player.y, player.ang, {
-      torso: '#4a5a48',
-      pants: '#1e1e24',
-      head: '#c4a07a',
-      hat: '#1a1610',
-    }, true));
-
-    return faces;
+    // Player — orange torso like reference
+    playerRoot = makePerson({
+      torso: 0xd45520, pants: 0x141418, head: 0xc4a07a, hat: 0x1a1410,
+    });
+    scene.add(playerRoot);
   }
 
-  function drawZoneTitle() {
-    if (zoneFade <= 0 || !zoneName) return;
-    const a = Math.min(1, zoneFade);
-    ctx.save();
-    ctx.globalAlpha = a;
-    ctx.font = '800 28px system-ui,sans-serif';
-    ctx.textAlign = 'center';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(20,10,4,0.85)';
-    ctx.fillStyle = '#f2e6d4';
-    const x = canvas.width * 0.5, y = canvas.height * 0.22;
-    ctx.strokeText(zoneName, x, y);
-    ctx.fillText(zoneName, x, y);
-    ctx.restore();
+  function setupThree() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(FOG_COLOR);
+    scene.fog = new THREE.FogExp2(FOG_COLOR, 0.018);
+
+    camera = new THREE.PerspectiveCamera(55, 1, 0.1, 280);
+
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = shadowsOn;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const amb = new THREE.AmbientLight(0xc4b090, 0.45);
+    scene.add(amb);
+    sun = new THREE.DirectionalLight(0xffe0b0, 1.35);
+    sun.position.set(-40, 55, 20);
+    sun.castShadow = shadowsOn;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.near = 5;
+    sun.shadow.camera.far = 160;
+    sun.shadow.camera.left = -50;
+    sun.shadow.camera.right = 50;
+    sun.shadow.camera.top = 50;
+    sun.shadow.camera.bottom = -50;
+    sun.shadow.bias = -0.001;
+    scene.add(sun);
+    scene.add(sun.target);
+
+    clock = new THREE.Clock();
+    buildWorld();
   }
 
-  function render() {
-    const vw = canvas.width, vh = canvas.height;
-    drawSky();
-    drawGroundPlane();
-
-    const faces = gatherScene();
-    faces.sort((a, b) => b.z - a.z);
-    for (const f of faces) fillPoly(f.pts, f.color);
-
-    // distance haze veil
-    const haze = ctx.createLinearGradient(0, vh * 0.35, 0, vh * 0.55);
-    haze.addColorStop(0, `rgba(${FOG.r},${FOG.g},${FOG.b},0.35)`);
-    haze.addColorStop(1, `rgba(${FOG.r},${FOG.g},${FOG.b},0)`);
-    ctx.fillStyle = haze;
-    ctx.fillRect(0, 0, vw, vh * 0.6);
-
-    drawZoneTitle();
+  function syncPlayerVisual(dt) {
+    playerRoot.position.set(player.x, 0, player.z);
+    playerRoot.rotation.y = player.ang;
+    // simple walk: alternate legs
+    if (player.moving && !reducedMotion) {
+      const t = clock.elapsedTime * 10;
+      playerRoot.userData.legs[0].position.z = Math.sin(t) * 0.15;
+      playerRoot.userData.legs[1].position.z = Math.sin(t + Math.PI) * 0.15;
+    } else {
+      playerRoot.userData.legs[0].position.z = 0;
+      playerRoot.userData.legs[1].position.z = 0;
+    }
+    // NPCs face player
+    for (const n of FronteiraWorld.npcs) {
+      const root = npcRoots[n.id];
+      if (!root) continue;
+      root.lookAt(player.x, 1.2, player.z);
+      root.rotation.x = 0; root.rotation.z = 0;
+    }
   }
 
-  function frame(t) {
-    if (!canvas) return;
-    const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
-    lastT = t;
+  function updateCamera(dt) {
+    const s = Math.sin(player.ang), c = Math.cos(player.ang);
+    const desired = _tmp.set(
+      player.x - s * CAM_DIST,
+      CAM_HEIGHT,
+      player.z - c * CAM_DIST
+    );
+    const k = 1 - Math.exp(-(reducedMotion ? 8 : 6) * dt);
+    camPos.lerp(desired, k);
+    lookPos.set(
+      player.x + s * LOOK_AHEAD,
+      1.4,
+      player.z + c * LOOK_AHEAD
+    );
+    camera.position.copy(camPos);
+    camera.lookAt(lookPos);
+    sun.target.position.set(player.x, 0, player.z);
+    sun.target.updateMatrixWorld();
+  }
 
+  function drawZoneOverlay() {
+    // zone title drawn via DOM hint-bar style — use a dedicated approach on canvas overlay after render
+    // We'll draw with 2D context on top if needed; for simplicity use hint when zone fades
+  }
+
+  let zoneEl = null;
+  function ensureZoneEl() {
+    if (zoneEl) return;
+    zoneEl = document.createElement('div');
+    zoneEl.id = 'zone-title';
+    zoneEl.style.cssText = 'position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font:800 28px system-ui,sans-serif;color:#f2e6d4;text-shadow:0 0 4px #000,0 2px 0 #000;pointer-events:none;z-index:4;opacity:0;letter-spacing:0.06em;';
+    document.getElementById('app').appendChild(zoneEl);
+  }
+
+  function updateZoneEl() {
+    ensureZoneEl();
+    zoneEl.textContent = zoneName || '';
+    zoneEl.style.opacity = String(Math.min(1, zoneFade));
+  }
+
+  function frame() {
+    const dt = Math.min(0.05, clock.getDelta());
     if (running && !paused && !won) {
       if (FronteiraInput.consumePause()) pause();
       else {
@@ -659,26 +569,40 @@ const FronteiraGame = (() => {
           move(dt);
           updateNear();
           updateZone(dt);
-          if (!reducedMotion) bobT += dt;
           if (FronteiraInput.consumeInteract()) tryInteract();
         } else if (FronteiraInput.consumeInteract()) {
           FronteiraUI.advanceDialog();
         }
-        syncCam(1 - Math.exp(-dt * 10));
       }
-    } else {
-      syncCam(0.2);
     }
-
-    render();
+    syncPlayerVisual(dt);
+    updateCamera(dt);
+    updateZoneEl();
+    renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
 
   function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    canvas.style.width = canvas.width + 'px';
-    canvas.style.height = canvas.height + 'px';
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+  }
+
+  function spawn() {
+    const sp = FronteiraWorld.spawn;
+    player.x = sp.x; player.z = sp.z; player.ang = sp.ang; player.moving = false;
+    FronteiraWorld.resetItems();
+    if (markerRoots.ferradura) markerRoots.ferradura.visible = true;
+    state = freshState();
+    won = false; near = null;
+    zoneName = ''; zoneFade = 0;
+    camPos.set(player.x, CAM_HEIGHT, player.z - CAM_DIST);
+    lookPos.set(player.x, 1.4, player.z + LOOK_AHEAD);
+    camera.position.copy(camPos);
+    camera.lookAt(lookPos);
   }
 
   function start() {
@@ -689,7 +613,7 @@ const FronteiraGame = (() => {
     FronteiraUI.setTouchVisible(true);
     FronteiraUI.setObjective(objectiveText());
     FronteiraInput.releaseAllDirs();
-    lastT = performance.now();
+    clock.getDelta();
   }
 
   function pause() {
@@ -701,7 +625,7 @@ const FronteiraGame = (() => {
     paused = false;
     FronteiraUI.hidePause();
     FronteiraInput.releaseAllDirs();
-    lastT = performance.now();
+    clock.getDelta();
   }
   function stopToMenu() {
     running = false; paused = false; won = false;
@@ -710,11 +634,22 @@ const FronteiraGame = (() => {
 
   function init(c) {
     canvas = c;
-    ctx = canvas.getContext('2d');
     reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // mobile: still enable shadows but smaller map already set
+    const isMobile = window.matchMedia('(max-width: 900px)').matches || ('ontouchstart' in window);
+    shadowsOn = true;
+    if (isMobile) {
+      // keep shadows but lower res already 1024
+    }
+    if (typeof THREE === 'undefined') {
+      console.error('THREE não carregou');
+      return;
+    }
+    setupThree();
     resize();
     window.addEventListener('resize', resize);
     spawn();
+    // render idle canyon on menu
     requestAnimationFrame(frame);
   }
 

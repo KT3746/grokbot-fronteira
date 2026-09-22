@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#3d2a1f" />
-  <meta name="description" content="FRONTEIRA — poeira, madeira e gente dura na beira do mapa" />
+  <meta name="description" content="FRONTEIRA — povoado de sertão em 3ª pessoa baixo-poli" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FRONTEIRA</title>
-  <link rel="stylesheet" href="css/style.css?v=202609221311" />
+  <link rel="stylesheet" href="css/style.css?v=202609221713" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233d2a1f'/%3E%3Crect x='10' y='28' width='44' height='22' fill='%235c3d2e'/%3E%3Cpolygon points='8,28 32,12 56,28' fill='%23c4a574'/%3E%3C/svg%3E" />
 </head>
 <body>
@@ -41,10 +41,10 @@
 
     <section id="screen-menu" class="overlay screen" aria-label="Menu">
       <div class="panel">
-        <p class="eyebrow">sertão · povoado · poeira</p>
+        <p class="eyebrow">sertão · rua · poeira</p>
         <h1 class="logo">FRONTEIRA</h1>
-        <p class="tagline">Poeira, madeira e gente dura — vista em terceira pessoa.</p>
-        <p class="rule">Ande · fale · ajude o dia a passar</p>
+        <p class="tagline">Poeira, madeira e gente dura — 3ª pessoa baixo-poli.</p>
+        <p class="rule">Ande pela rua · fale · ajude o dia a passar</p>
         <button type="button" id="btn-play" class="btn primary">Jogar</button>
         <button type="button" id="btn-mute-menu" class="btn ghost">Mudo: off</button>
       </div>
@@ -54,10 +54,10 @@
       <div class="panel tip-panel">
         <h2>Como jogar</h2>
         <ul class="tips">
-          <li><strong>Ande</strong> em 3ª pessoa: D-pad / WASD movem em relação à câmera (personagem vira).</li>
+          <li><strong>Ande</strong> em 3ª pessoa pela rua principal (D-pad / WASD).</li>
           <li><strong>Interagir</strong> (botão / E / Espaço) fala com gente e objetos.</li>
           <li>Complete as <span class="c-warm">tarefas do dia</span> no HUD.</li>
-          <li>Olhe a rua à frente — praça, cantina, armazém, estábulo, capela.</li>
+          <li>Armazém, cantina, poço, estábulo e capela ficam ao longo da rua.</li>
         </ul>
         <p class="rule">3ª pessoa · D-pad · Interagir · Esc = pausa</p>
         <button type="button" id="btn-tip-ok" class="btn primary">Entendi</button>
@@ -92,11 +92,12 @@
     </section>
   </div>
 
-  <script src="js/audio.js?v=202609221311"></script>
-  <script src="js/world.js?v=202609221311"></script>
-  <script src="js/input.js?v=202609221311"></script>
-  <script src="js/ui.js?v=202609221311"></script>
-  <script src="js/game.js?v=202609221311"></script>
-  <script src="js/main.js?v=202609221311"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="js/audio.js?v=202609221713"></script>
+  <script src="js/world.js?v=202609221713"></script>
+  <script src="js/input.js?v=202609221713"></script>
+  <script src="js/ui.js?v=202609221713"></script>
+  <script src="js/game.js?v=202609221713"></script>
+  <script src="js/main.js?v=202609221713"></script>
 </body>
 </html>
