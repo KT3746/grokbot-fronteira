@@ -28,16 +28,16 @@ const FronteiraWorld = (() => {
   // Collision AABBs (world px): buildings, fences, well rim
   const solids = [
     // Capela (norte)
-    { x: 17 * TILE, y: 3 * TILE, w: 8 * TILE, h: 5 * TILE, label: 'capela' },
+    { x: 17 * TILE, y: 3 * TILE, w: 8 * TILE, h: 5 * TILE, label: 'capela', style: 'capela', facade: 96 },
     // Armazém (oeste)
-    { x: 4 * TILE, y: 10 * TILE, w: 7 * TILE, h: 5.5 * TILE, label: 'armazem' },
+    { x: 4 * TILE, y: 10 * TILE, w: 7 * TILE, h: 5.5 * TILE, label: 'armazem', style: 'armazem', facade: 78 },
     // Cantina (leste)
-    { x: 29 * TILE, y: 10 * TILE, w: 8 * TILE, h: 5.5 * TILE, label: 'cantina' },
+    { x: 29 * TILE, y: 10 * TILE, w: 8 * TILE, h: 5.5 * TILE, label: 'cantina', style: 'cantina', facade: 78 },
     // Estábulo (sul-oeste)
-    { x: 5 * TILE, y: 22 * TILE, w: 9 * TILE, h: 5.5 * TILE, label: 'estabulo' },
+    { x: 5 * TILE, y: 22 * TILE, w: 9 * TILE, h: 5.5 * TILE, label: 'estabulo', style: 'estabulo', facade: 70 },
     // Casas
-    { x: 28 * TILE, y: 21 * TILE, w: 6 * TILE, h: 5 * TILE, label: 'casa1' },
-    { x: 14 * TILE, y: 22 * TILE, w: 5 * TILE, h: 4 * TILE, label: 'casa2' },
+    { x: 28 * TILE, y: 21 * TILE, w: 6 * TILE, h: 5 * TILE, label: 'casa1', style: 'casa', facade: 64 },
+    { x: 14 * TILE, y: 22 * TILE, w: 5 * TILE, h: 4 * TILE, label: 'casa2', style: 'casa', facade: 60 },
     // Cerca estábulo (aberto ao norte)
     { x: 4 * TILE, y: 21 * TILE, w: 11 * TILE, h: 10, label: 'cerca-s' },
     { x: 4 * TILE, y: 21 * TILE, w: 10, h: 7 * TILE, label: 'cerca-w' },
@@ -98,6 +98,9 @@ const FronteiraWorld = (() => {
       name: 'Seu Zé',
       x: 7.5 * TILE, y: 16.85 * TILE,
       color: '#6b4a32',
+      shirt: '#8a6238',
+      pants: '#3a3428',
+      skin: '#c4a07a',
       hat: '#3a2818',
       place: 'Armazém',
       lines: {
@@ -121,6 +124,9 @@ const FronteiraWorld = (() => {
       name: 'Dona Clara',
       x: 32.5 * TILE, y: 16.85 * TILE,
       color: '#8a4a3a',
+      shirt: '#a85848',
+      pants: '#5a3040',
+      skin: '#d4b090',
       hat: '#c4a574',
       place: 'Cantina',
       lines: {
@@ -144,6 +150,9 @@ const FronteiraWorld = (() => {
       name: 'Tião',
       x: 9 * TILE, y: 21.2 * TILE,
       color: '#5a6a3a',
+      shirt: '#6a7a42',
+      pants: '#3a3a28',
+      skin: '#b89068',
       hat: '#4a3828',
       place: 'Estábulo',
       lines: {
@@ -164,6 +173,9 @@ const FronteiraWorld = (() => {
       name: 'Padre Elias',
       x: 20.5 * TILE, y: 8.55 * TILE,
       color: '#3a3a48',
+      shirt: '#2e2e38',
+      pants: '#1e1e28',
+      skin: '#c8a888',
       hat: '#2a2a32',
       place: 'Capela',
       lines: {
@@ -181,6 +193,9 @@ const FronteiraWorld = (() => {
       name: 'Rita',
       x: 23 * TILE, y: 17.5 * TILE,
       color: '#7a5a6a',
+      shirt: '#8a6070',
+      pants: '#4a3848',
+      skin: '#d0a878',
       hat: '#d4b890',
       place: 'Praça',
       lines: {

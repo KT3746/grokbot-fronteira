@@ -42,7 +42,7 @@ js/audio.js  world.js  input.js  ui.js  game.js  main.js
 .nojekyll
 ```
 
-Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
+Vista **¾ / oblíqua** (não top-down puro): fachadas altas, profundidade por Y, céu e mato ao longe. Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
 
 Jogo **original** — sem personagens ou marcas licenciadas.
 
