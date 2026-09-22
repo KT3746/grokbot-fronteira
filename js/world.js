@@ -28,16 +28,16 @@ const FronteiraWorld = (() => {
   // Collision AABBs (world px): buildings, fences, well rim
   const solids = [
     // Capela (norte)
-    { x: 17 * TILE, y: 3 * TILE, w: 8 * TILE, h: 5 * TILE, label: 'capela', style: 'capela', facade: 118 },
+    { x: 17 * TILE, y: 3 * TILE, w: 8 * TILE, h: 5 * TILE, label: 'capela', style: 'capela', facade: 118, height3d: 140, color: '#c4b49a' },
     // Armazém (oeste)
-    { x: 4 * TILE, y: 10 * TILE, w: 7 * TILE, h: 5.5 * TILE, label: 'armazem', style: 'armazem', facade: 100 },
+    { x: 4 * TILE, y: 10 * TILE, w: 7 * TILE, h: 5.5 * TILE, label: 'armazem', style: 'armazem', facade: 100, height3d: 110, color: '#8a6a48' },
     // Cantina (leste)
-    { x: 29 * TILE, y: 10 * TILE, w: 8 * TILE, h: 5.5 * TILE, label: 'cantina', style: 'cantina', facade: 100 },
+    { x: 29 * TILE, y: 10 * TILE, w: 8 * TILE, h: 5.5 * TILE, label: 'cantina', style: 'cantina', facade: 100, height3d: 115, color: '#9a5848' },
     // Estábulo (sul-oeste)
-    { x: 5 * TILE, y: 22 * TILE, w: 9 * TILE, h: 5.5 * TILE, label: 'estabulo', style: 'estabulo', facade: 92 },
+    { x: 5 * TILE, y: 22 * TILE, w: 9 * TILE, h: 5.5 * TILE, label: 'estabulo', style: 'estabulo', facade: 92, height3d: 95, color: '#8a7848' },
     // Casas
-    { x: 28 * TILE, y: 21 * TILE, w: 6 * TILE, h: 5 * TILE, label: 'casa1', style: 'casa', facade: 86 },
-    { x: 14 * TILE, y: 22 * TILE, w: 5 * TILE, h: 4 * TILE, label: 'casa2', style: 'casa', facade: 82 },
+    { x: 28 * TILE, y: 21 * TILE, w: 6 * TILE, h: 5 * TILE, label: 'casa1', style: 'casa', facade: 86, height3d: 90, color: '#a88860' },
+    { x: 14 * TILE, y: 22 * TILE, w: 5 * TILE, h: 4 * TILE, label: 'casa2', style: 'casa', facade: 82, height3d: 85, color: '#9a7a58' },
     // Cerca estábulo (aberto ao norte)
     { x: 4 * TILE, y: 21 * TILE, w: 11 * TILE, h: 10, label: 'cerca-s' },
     { x: 4 * TILE, y: 21 * TILE, w: 10, h: 7 * TILE, label: 'cerca-w' },

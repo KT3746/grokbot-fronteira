@@ -24,7 +24,7 @@ Personagens: Seu Zé, Dona Clara, Tião, Padre Elias, Rita.
 
 | Ação | Teclado | Toque |
 |------|---------|-------|
-| Mover | WASD / setas | D-pad |
+| Mover (relativo à câmera) | WASD / setas | D-pad |
 | Interagir | E / Espaço | Botão Interagir |
 | Pausar | Esc | Botão ❚❚ |
 | Mudo | — | 🔊 |
@@ -42,7 +42,7 @@ js/audio.js  world.js  input.js  ui.js  game.js  main.js
 .nojekyll
 ```
 
-Vista **¾ / oblíqua** cinematográfica (sertão adulto: grade de cor, sombra longa, fachadas altas — sem visual cartunesco). Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
+Câmera em **terceira pessoa** (atrás do personagem, olhando a rua) com render **baixo-poli** em perspectiva Canvas 2D — sertão ocre, névoa no horizonte, sombras duras. Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
 
 Jogo **original** — sem personagens ou marcas licenciadas.
 

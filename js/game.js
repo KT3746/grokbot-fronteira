@@ -1,28 +1,26 @@
-/* FRONTEIRA — loop + render sertão cinematográfico (¾) */
+/* FRONTEIRA — 3ª pessoa baixo-poli (perspectiva Canvas 2D) */
 const FronteiraGame = (() => {
   const PLAYER_R = 11;
-  const SPEED = 118;
-  const Y_SCALE = 0.52;
-  const CHAR_H = 36; // adult-ish screen height
-  const SUN = { x: -0.72, y: 0.18 }; // light from upper-left → long rightward shadows
+  const SPEED = 125;
+  const TURN_SPEED = 3.2;
+  const CAM_DIST = 62;
+  const CAM_HEIGHT = 36;
+  const LOOK_AHEAD = 55;
+  const FOCAL = 320;
+  const NEAR = 8;
+  const FOG_START = 120;
+  const FOG_END = 520;
+  const FOG = { r: 196, g: 168, b: 120 }; // dusty sepia haze
+  const SUN = { x: 0.55, y: -0.15, z: 0.35 }; // world dir for hard shadows
 
   let canvas, ctx;
-  let running = false;
-  let paused = false;
-  let lastT = 0;
-  let camX = 0, camY = 0;
-  let player = { x: 0, y: 0, moving: false, facing: 1 };
-  let dayT = 0;
-  let state = null;
-  let near = null;
-  let won = false;
+  let running = false, paused = false, won = false;
+  let lastT = 0, bobT = 0;
+  let state = null, near = null;
   let reducedMotion = false;
-  let bobT = 0;
-  let dust = [];
-  let groundCache = null;
-  let groundCacheKey = '';
-  let grainPat = null;
-  let walkPhase = 0;
+  let zoneName = '', zoneFade = 0;
+  let player = { x: 0, y: 0, ang: 0, moving: false };
+  let cam = { x: 0, y: CAM_HEIGHT, z: 0, yaw: 0 };
 
   function freshState() {
     return {
@@ -32,7 +30,6 @@ const FronteiraGame = (() => {
         talkedRita: false, hasWater: false, deliveredWater: false,
       },
       questDone: { entrega: false, ferradura: false, agua: false },
-      activeFocus: 'entrega',
     };
   }
 
@@ -40,36 +37,20 @@ const FronteiraGame = (() => {
     const { TILE } = FronteiraWorld;
     player.x = 21 * TILE;
     player.y = 18 * TILE;
+    player.ang = Math.PI; // face toward capela (north = -Y)
     player.moving = false;
-    player.facing = 1;
     FronteiraWorld.resetItems();
     state = freshState();
-    dayT = 0.42; // late afternoon bias
     won = false;
     near = null;
     bobT = 0;
-    walkPhase = 0;
-    initDust();
-    groundCache = null;
-  }
-
-  function initDust() {
-    dust = [];
-    if (reducedMotion) return;
-    for (let i = 0; i < 22; i++) {
-      dust.push({
-        x: Math.random(), y: Math.random(),
-        s: 0.4 + Math.random() * 1.8,
-        sp: 0.008 + Math.random() * 0.02,
-        a: 0.04 + Math.random() * 0.07,
-        drift: (Math.random() - 0.5) * 0.02,
-      });
-    }
+    zoneName = '';
+    zoneFade = 0;
+    syncCam(1);
   }
 
   function objectiveText() {
-    const f = state.flags;
-    const qd = state.questDone;
+    const f = state.flags, qd = state.questDone;
     if (!qd.entrega) {
       if (!f.talkedZe) return 'Fale com Seu Zé no armazém';
       if (f.hasPackage && !f.deliveredPackage) return 'Entregue a encomenda na cantina';
@@ -98,8 +79,7 @@ const FronteiraGame = (() => {
   function checkWin() {
     if (won) return;
     if (countDone() >= 3) {
-      won = true;
-      running = false;
+      won = true; running = false;
       FronteiraAudio.questDone();
       FronteiraUI.showWin('Tarefas: 3/3 — o sertão respira.');
     }
@@ -117,7 +97,6 @@ const FronteiraGame = (() => {
     const f = state.flags;
     const lines = [];
     let after = null;
-
     if (npc.id === 'seu_ze') {
       if (!f.talkedZe) {
         lines.push(...npc.lines.quest_give);
@@ -145,19 +124,15 @@ const FronteiraGame = (() => {
       } else if (f.returnedShoe) lines.push(...npc.lines.after);
       else lines.push('A ferradura deve estar no mato, ao sul do estábulo.');
     } else if (npc.id === 'padre_elias') {
-      lines.push(...npc.lines.idle);
-      lines.push(...npc.lines.bless);
+      lines.push(...npc.lines.idle); lines.push(...npc.lines.bless);
     } else if (npc.id === 'rita') {
       if (!f.talkedRita) {
         lines.push(...npc.lines.idle);
         after = () => { f.talkedRita = true; FronteiraUI.setObjective(objectiveText()); };
-      } else if (f.deliveredWater) {
-        lines.push(...npc.lines.thanks);
-        lines.push(...npc.lines.after);
-      } else if (f.hasWater) lines.push(...npc.lines.got_water);
+      } else if (f.deliveredWater) { lines.push(...npc.lines.thanks); lines.push(...npc.lines.after); }
+      else if (f.hasWater) lines.push(...npc.lines.got_water);
       else lines.push('O poço fica bem no meio da praça. Enche o balde aí.');
     } else lines.push('…');
-
     FronteiraAudio.interactChime();
     FronteiraUI.showDialog(npc.name, lines, after);
   }
@@ -172,15 +147,12 @@ const FronteiraGame = (() => {
     if (spot.kind === 'well') {
       if (f.talkedRita && !f.hasWater && !f.deliveredWater) {
         FronteiraAudio.interactChime();
-        FronteiraUI.showDialog('Poço', [
-          'Você enche o balde. A água vem fria, cheirando a barro bom.',
-        ], () => { f.hasWater = true; FronteiraUI.setObjective(objectiveText()); });
+        FronteiraUI.showDialog('Poço', ['Você enche o balde. A água vem fria, cheirando a barro bom.'],
+          () => { f.hasWater = true; FronteiraUI.setObjective(objectiveText()); });
       } else if (f.hasWater) {
-        FronteiraUI.showDialog('Poço', ['O balde já está cheio.']);
-        FronteiraAudio.interactChime();
+        FronteiraUI.showDialog('Poço', ['O balde já está cheio.']); FronteiraAudio.interactChime();
       } else if (f.deliveredWater) {
-        FronteiraUI.showDialog('Poço', ['Água clara. O dia já foi servido.']);
-        FronteiraAudio.interactChime();
+        FronteiraUI.showDialog('Poço', ['Água clara. O dia já foi servido.']); FronteiraAudio.interactChime();
       } else {
         FronteiraUI.showDialog('Poço', ['Poço da praça. Rita costuma mandar gente buscar água.']);
         FronteiraAudio.interactChime();
@@ -194,8 +166,7 @@ const FronteiraGame = (() => {
         FronteiraAudio.interactChime();
         return;
       }
-      spot.collected = true;
-      f.hasHorseshoe = true;
+      spot.collected = true; f.hasHorseshoe = true;
       FronteiraAudio.interactChime();
       FronteiraUI.showDialog('Ferradura', ['Você achou a ferradura perdida do Tião.'],
         () => FronteiraUI.setObjective(objectiveText()));
@@ -208,23 +179,38 @@ const FronteiraGame = (() => {
     else if (near.type === 'spot') useSpot(near.ref);
   }
 
+  function angLerp(a, b, t) {
+    let d = b - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return a + d * t;
+  }
+
   function move(dt) {
     const m = FronteiraInput.movement();
-    player.moving = !!(m.x || m.y);
+    const mag = Math.hypot(m.x, m.y);
+    player.moving = mag > 0.05;
     if (!player.moving) return;
-    if (m.x) player.facing = m.x > 0 ? 1 : -1;
-    walkPhase += dt * 9;
+
+    // Camera-relative wish: up = forward along facing, left/right = strafe
+    const s = Math.sin(player.ang), c = Math.cos(player.ang);
+    // input y: -1 = up = forward
+    const wishX = (-m.y) * s + m.x * c;
+    const wishY = (-m.y) * c - m.x * s;
+    const target = Math.atan2(wishX, wishY);
+    player.ang = angLerp(player.ang, target, Math.min(1, TURN_SPEED * dt));
+
     const dist = SPEED * dt;
-    const tryX = player.x + m.x * dist;
-    const tryY = player.y + m.y * dist;
+    const nx = player.x + wishX * dist;
+    const ny = player.y + wishY * dist;
     const box = (x, y) => ({ x: x - PLAYER_R, y: y - PLAYER_R + 2, w: PLAYER_R * 2, h: PLAYER_R * 2 - 2 });
-    if (!FronteiraWorld.collides(box(tryX, player.y))) player.x = tryX;
-    if (!FronteiraWorld.collides(box(player.x, tryY))) player.y = tryY;
+    if (!FronteiraWorld.collides(box(nx, player.y))) player.x = nx;
+    if (!FronteiraWorld.collides(box(player.x, ny))) player.y = ny;
     FronteiraAudio.footstep();
   }
 
   function updateNear() {
-    near = FronteiraWorld.nearInteract(player.x, player.y, 28);
+    near = FronteiraWorld.nearInteract(player.x, player.y, 36);
     let hint = '';
     if (near) {
       if (near.type === 'npc') hint = near.ref.name + ' — Interagir';
@@ -234,753 +220,430 @@ const FronteiraGame = (() => {
     FronteiraUI.setInteractReady(!!near);
   }
 
-  /* ——— projection ——— */
-  function w2s(wx, wy) {
-    return { x: wx - camX, y: wy * Y_SCALE - camY };
+  function updateZone(dt) {
+    const { TILE } = FronteiraWorld;
+    const tx = player.x / TILE, ty = player.y / TILE;
+    let z = 'Povoado';
+    if (tx >= 16 && tx <= 24 && ty >= 12 && ty <= 18) z = 'Praça';
+    else if (tx >= 4 && tx <= 12 && ty >= 10 && ty <= 17) z = 'Armazém';
+    else if (tx >= 28 && tx <= 38 && ty >= 10 && ty <= 17) z = 'Cantina';
+    else if (tx >= 5 && tx <= 15 && ty >= 20 && ty <= 28) z = 'Estábulo';
+    else if (tx >= 16 && tx <= 26 && ty >= 3 && ty <= 9) z = 'Capela';
+    else if (ty > 26 || tx < 4 || tx > 38) z = 'Beira do mato';
+    if (z !== zoneName) { zoneName = z; zoneFade = 1.8; }
+    else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
   }
 
-  function updateCamera() {
-    const { w, h } = FronteiraWorld.worldPixelSize();
+  function syncCam(snap) {
+    const s = Math.sin(player.ang), c = Math.cos(player.ang);
+    const tx = player.x - s * CAM_DIST;
+    const tz = player.y - c * CAM_DIST;
+    const ty = CAM_HEIGHT;
+    if (snap >= 1) {
+      cam.x = tx; cam.z = tz; cam.y = ty; cam.yaw = player.ang;
+    } else {
+      const k = Math.min(1, snap);
+      cam.x += (tx - cam.x) * k;
+      cam.z += (tz - cam.z) * k;
+      cam.y += (ty - cam.y) * k;
+      cam.yaw = angLerp(cam.yaw, player.ang, k);
+    }
+  }
+
+  /* ——— perspective ——— */
+  function project(wx, wy, wz) {
+    // world: x, height wy, depth wz (= map y)
+    const dx = wx - cam.x;
+    const dy = wy - cam.y;
+    const dz = wz - cam.z;
+    const s = Math.sin(cam.yaw), c = Math.cos(cam.yaw);
+    // camera space: +X right, +Y up, +Z forward
+    const rx = dx * c - dz * s;
+    const rz = dx * s + dz * c;
+    const ry = dy;
+    if (rz <= NEAR) return null;
+    const sc = FOCAL / rz;
     const vw = canvas.width, vh = canvas.height;
-    const projH = h * Y_SCALE;
-    camX = player.x - vw * 0.5;
-    camY = player.y * Y_SCALE - vh * 0.6;
-    const padTop = 56;
-    camX = Math.max(0, Math.min(camX, Math.max(0, w - vw)));
-    camY = Math.max(-padTop, Math.min(camY, Math.max(-padTop, projH - vh + 24)));
+    return {
+      x: vw * 0.5 + rx * sc,
+      y: vh * 0.52 - ry * sc, // horizon slightly above center
+      z: rz,
+      sc,
+    };
   }
 
-  function duskFactor() {
-    // 0 morning-ish … 1 deep dusk — dayT drives soft cycle
-    const t = dayT % 1;
-    if (t < 0.35) return 0.25 + t * 0.4;
-    if (t < 0.55) return 0.45;
-    return 0.45 + (t - 0.55) * 1.1;
+  function fogAlpha(z) {
+    if (z <= FOG_START) return 0;
+    if (z >= FOG_END) return 1;
+    return (z - FOG_START) / (FOG_END - FOG_START);
   }
 
-  /* ——— cached ground noise (performance) ——— */
-  function hash2(x, y) {
-    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return n - Math.floor(n);
+  function shadeColor(hex, face, fog) {
+    // face: 0 top, 1 sun-lit side, 2 front, 3 shade side
+    const mul = face === 0 ? 1.08 : face === 1 ? 1.0 : face === 2 ? 0.78 : 0.55;
+    const n = parseInt(hex.slice(1), 16);
+    let r = ((n >> 16) & 255) * mul;
+    let g = ((n >> 8) & 255) * mul;
+    let b = (n & 255) * mul;
+    r = r + (FOG.r - r) * fog;
+    g = g + (FOG.g - g) * fog;
+    b = b + (FOG.b - b) * fog;
+    return `rgb(${r|0},${g|0},${b|0})`;
   }
 
-  function ensureGrain() {
-    if (grainPat || reducedMotion) return;
-    const c = document.createElement('canvas');
-    c.width = 128; c.height = 128;
-    const g = c.getContext('2d');
-    const img = g.createImageData(128, 128);
-    for (let i = 0; i < img.data.length; i += 4) {
-      const v = (Math.random() * 255) | 0;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = 18;
-    }
-    g.putImageData(img, 0, 0);
-    grainPat = ctx.createPattern(c, 'repeat');
+  function fillPoly(pts, color) {
+    if (pts.length < 3) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
   }
 
-  function ensureGroundCache() {
-    const { TILE, ground, W, H } = FronteiraWorld;
-    const key = W + 'x' + H;
-    if (groundCache && groundCacheKey === key) return;
-    groundCacheKey = key;
-    const c = document.createElement('canvas');
-    c.width = W * TILE;
-    c.height = Math.ceil(H * TILE * Y_SCALE) + 2;
-    const g = c.getContext('2d');
-
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const t = ground[y][x];
-        const px = x * TILE;
-        const py = y * TILE * Y_SCALE;
-        const th = TILE * Y_SCALE + 0.8;
-        const n = hash2(x, y);
-        const n2 = hash2(x + 3, y + 7);
-
-        let base;
-        if (t === 1) base = [168, 138, 98];      // plaza clay
-        else if (t === 2) base = [78, 86, 52];   // dry scrub
-        else if (t === 3) base = [42, 58, 62];   // well water footprint
-        else if (t === 4) base = [140, 112, 78]; // road
-        else base = [128, 100, 70];              // dirt
-
-        // value noise patches
-        const v = (n - 0.5) * 28 + (n2 - 0.5) * 12;
-        const r = Math.max(0, Math.min(255, base[0] + v));
-        const gg = Math.max(0, Math.min(255, base[1] + v * 0.85));
-        const b = Math.max(0, Math.min(255, base[2] + v * 0.55));
-        g.fillStyle = `rgb(${r|0},${gg|0},${b|0})`;
-        g.fillRect(px, py, TILE + 0.5, th);
-
-        // cracked earth / grit
-        if (t !== 3 && n > 0.62) {
-          g.strokeStyle = `rgba(40,28,16,${0.08 + n * 0.12})`;
-          g.lineWidth = 1;
-          g.beginPath();
-          g.moveTo(px + 3, py + th * 0.3);
-          g.lineTo(px + 10 + n * 8, py + th * 0.55);
-          g.stroke();
-        }
-        // road ruts
-        if (t === 4) {
-          g.strokeStyle = 'rgba(55,38,22,0.28)';
-          g.lineWidth = 1.4;
-          g.beginPath();
-          g.moveTo(px + 2, py + th * 0.32);
-          g.lineTo(px + TILE - 2, py + th * 0.38);
-          g.moveTo(px + 2, py + th * 0.62);
-          g.lineTo(px + TILE - 2, py + th * 0.68);
-          g.stroke();
-        }
-        // plaza packed patches
-        if (t === 1 && n2 > 0.7) {
-          g.fillStyle = 'rgba(90,65,40,0.1)';
-          g.beginPath();
-          g.ellipse(px + 10 + n * 12, py + th * 0.45, 6 + n * 4, 2.5, 0, 0, Math.PI * 2);
-          g.fill();
-        }
-        // sparse dry scrub tufts (baked)
-        if (t === 2 || (t === 0 && n > 0.88)) {
-          g.strokeStyle = n > 0.5 ? 'rgba(90,95,55,0.55)' : 'rgba(60,65,40,0.5)';
-          g.lineWidth = 1.1;
-          const gx = px + 5 + n * (TILE - 10);
-          const gy = py + th * 0.72;
-          g.beginPath();
-          g.moveTo(gx, gy);
-          g.lineTo(gx - 1.5, gy - 4 - n * 3);
-          g.moveTo(gx + 2, gy);
-          g.lineTo(gx + 3, gy - 3.5);
-          g.stroke();
-        }
-      }
-    }
-    groundCache = c;
+  function avgZ(pts) {
+    let s = 0, n = 0;
+    for (const p of pts) { if (p) { s += p.z; n++; } }
+    return n ? s / n : 1e9;
   }
 
-  function drawGround() {
-    ensureGroundCache();
-    if (!groundCache) return;
-    // groundCache is in foreshortened Y already (world x, foreshortened y)
-    ctx.drawImage(groundCache, -camX, -camY);
-  }
-
-  /* ——— sky / atmosphere ——— */
+  /* ——— ground (perspective strips) ——— */
   function drawSky() {
     const vw = canvas.width, vh = canvas.height;
-    const dusk = duskFactor();
-    const g = ctx.createLinearGradient(0, 0, 0, vh * 0.48);
-    // desaturated heat sky
-    g.addColorStop(0, mixHex('#5a6a7a', '#6a5570', dusk * 0.35));
-    g.addColorStop(0.4, mixHex('#8a9aaa', '#a89078', dusk * 0.45));
-    g.addColorStop(0.75, mixHex('#b8a890', '#c49868', dusk * 0.5));
-    g.addColorStop(1, mixHex('#c4a878', '#b87848', dusk * 0.55));
+    const g = ctx.createLinearGradient(0, 0, 0, vh * 0.55);
+    g.addColorStop(0, '#c4a878');
+    g.addColorStop(0.55, '#b89868');
+    g.addColorStop(1, '#a88858');
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, vw, vh * 0.48);
-
-    // hazy sun disk
-    const sx = vw * 0.18 - camX * 0.02;
-    const sy = vh * (0.12 + dusk * 0.08);
-    const rad = ctx.createRadialGradient(sx, sy, 2, sx, sy, 70);
-    rad.addColorStop(0, `rgba(255,210,140,${0.55 - dusk * 0.15})`);
-    rad.addColorStop(0.35, `rgba(220,150,80,${0.22})`);
-    rad.addColorStop(1, 'rgba(180,120,60,0)');
-    ctx.fillStyle = rad;
-    ctx.fillRect(sx - 80, sy - 80, 160, 160);
-
-    // distant mesas — soft silhouettes
-    drawMesaBand(vw, vh * 0.30, camX * 0.18, '#4a4038', 22, 0.04);
-    drawMesaBand(vw, vh * 0.34, camX * 0.32, '#3a3830', 16, 0.055);
-    // near scrub line
-    ctx.fillStyle = '#3a3a2e';
-    ctx.beginPath();
-    ctx.moveTo(0, vh * 0.40);
-    for (let x = 0; x <= vw + 30; x += 20) {
-      const wx = (x + camX * 0.45) * 0.05;
-      const hy = vh * 0.36 - Math.abs(Math.sin(wx * 1.4)) * 10;
-      ctx.lineTo(x, hy);
-    }
-    ctx.lineTo(vw, vh * 0.45);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillRect(0, 0, vw, vh);
   }
 
-  function drawMesaBand(vw, baseY, parallax, color, amp, freq) {
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.moveTo(0, baseY + 50);
-    for (let x = 0; x <= vw + 40; x += 24) {
-      const wx = (x + parallax) * freq;
-      const hy = baseY - 8 - Math.sin(wx) * amp - Math.sin(wx * 0.4) * (amp * 0.5);
-      // flat-top mesa feel
-      const mesa = Math.sin(wx * 0.7) > 0.55 ? amp * 0.6 : 0;
-      ctx.lineTo(x, hy - mesa);
-    }
-    ctx.lineTo(vw, baseY + 60);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  function drawGroundPlane() {
+    const { TILE, ground, W, H } = FronteiraWorld;
+    // Sample ground quads in a window around player for performance
+    const reach = 18;
+    const cx = Math.floor(player.x / TILE);
+    const cy = Math.floor(player.y / TILE);
+    const faces = [];
 
-  function mixHex(a, b, t) {
-    const pa = hexToRgb(a), pb = hexToRgb(b);
-    const r = (pa.r + (pb.r - pa.r) * t) | 0;
-    const g = (pa.g + (pb.g - pa.g) * t) | 0;
-    const bl = (pa.b + (pb.b - pa.b) * t) | 0;
-    return `rgb(${r},${g},${bl})`;
-  }
-  function hexToRgb(h) {
-    const n = parseInt(h.slice(1), 16);
-    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-  }
+    for (let ty = cy - reach; ty <= cy + reach; ty++) {
+      for (let tx = cx - reach; tx <= cx + reach; tx++) {
+        if (ty < 0 || tx < 0 || ty >= H || tx >= W) continue;
+        const t = ground[ty][tx];
+        let col = '#8a6a48';
+        if (t === 1) col = '#a88860';
+        else if (t === 2) col = '#5a6840';
+        else if (t === 3) col = '#3a5058';
+        else if (t === 4) col = '#6a5a48';
 
-  /* ——— buildings ——— */
-  function weatheredSign(sx, sy, text) {
-    if (!text) return;
-    const tw = Math.min(78, text.length * 5.4 + 12);
-    ctx.fillStyle = 'rgba(48, 34, 22, 0.72)';
-    ctx.strokeStyle = 'rgba(140, 110, 75, 0.35)';
-    ctx.lineWidth = 1;
-    roundRect(sx - tw / 2, sy - 11, tw, 13, 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(210, 190, 160, 0.78)';
-    ctx.font = '600 9px system-ui,sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, sx, sy - 4.5);
-  }
-
-  function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  function longShadow(cx, cy, w, hScale) {
-    // ground shadow stretched by sun direction
-    const len = 18 + hScale * 0.22;
-    ctx.fillStyle = 'rgba(20, 12, 6, 0.28)';
-    ctx.beginPath();
-    ctx.moveTo(cx - w * 0.45, cy);
-    ctx.lineTo(cx + w * 0.45, cy);
-    ctx.lineTo(cx + w * 0.45 - SUN.x * len * 40, cy + len);
-    ctx.lineTo(cx - w * 0.45 - SUN.x * len * 40, cy + len);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawPlankFacade(x, y, w, h, wallRgb, lit) {
-    // vertical value bands + horizontal plank lines
-    for (let i = 0; i < w; i += 7) {
-      const n = hash2(i + (x | 0), (y | 0));
-      const shade = lit ? (n - 0.5) * 18 : (n - 0.5) * 10 - 18;
-      const r = Math.max(0, Math.min(255, wallRgb[0] + shade));
-      const g = Math.max(0, Math.min(255, wallRgb[1] + shade * 0.9));
-      const b = Math.max(0, Math.min(255, wallRgb[2] + shade * 0.7));
-      ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
-      ctx.fillRect(x + i, y, Math.min(7, w - i), h);
-    }
-    ctx.strokeStyle = 'rgba(20,12,8,0.22)';
-    ctx.lineWidth = 1;
-    for (let yy = y + 5; yy < y + h - 2; yy += 6) {
-      ctx.beginPath();
-      ctx.moveTo(x + 1, yy + hash2(yy, x) * 1.2);
-      ctx.lineTo(x + w - 1, yy);
-      ctx.stroke();
-    }
-    // lit edge (sun side)
-    ctx.fillStyle = `rgba(255,210,150,${0.06 + lit * 0.05})`;
-    ctx.fillRect(x, y, 5, h);
-    // shadow edge
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(x + w - 7, y, 7, h);
-  }
-
-  function drawDirtyWindow(x, y, dusk) {
-    ctx.fillStyle = '#1a120c';
-    ctx.fillRect(x, y, 11, 13);
-    const glow = 0.12 + dusk * 0.35;
-    ctx.fillStyle = `rgba(210, 140, 70, ${glow})`;
-    ctx.fillRect(x + 2, y + 2, 7, 9);
-    ctx.strokeStyle = 'rgba(50,35,22,0.8)';
-    ctx.strokeRect(x, y, 11, 13);
-    ctx.beginPath();
-    ctx.moveTo(x + 5.5, y); ctx.lineTo(x + 5.5, y + 13);
-    ctx.moveTo(x, y + 6.5); ctx.lineTo(x + 11, y + 6.5);
-    ctx.stroke();
-    // dirt smear
-    ctx.fillStyle = 'rgba(40,30,20,0.25)';
-    ctx.fillRect(x + 1, y + 9, 9, 3);
-  }
-
-  function drawRoofCinematic(x, y, w, thick, dark, mid) {
-    // thickness / eave shadow
-    ctx.fillStyle = dark;
-    ctx.beginPath();
-    ctx.moveTo(x - 10, y + 10);
-    ctx.lineTo(x + w / 2, y - thick);
-    ctx.lineTo(x + w + 10, y + 10);
-    ctx.lineTo(x + w + 10, y + 16);
-    ctx.lineTo(x + w / 2, y - thick + 9);
-    ctx.lineTo(x - 10, y + 16);
-    ctx.closePath();
-    ctx.fill();
-    // face
-    const grd = ctx.createLinearGradient(x, y - thick, x + w, y + 10);
-    grd.addColorStop(0, mid);
-    grd.addColorStop(0.5, dark);
-    grd.addColorStop(1, '#1a100a');
-    ctx.fillStyle = grd;
-    ctx.beginPath();
-    ctx.moveTo(x - 10, y + 10);
-    ctx.lineTo(x + w / 2, y - thick);
-    ctx.lineTo(x + w + 10, y + 10);
-    ctx.closePath();
-    ctx.fill();
-    // eave shadow on wall
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.fillRect(x, y + 10, w, 6);
-  }
-
-  function drawBuildingFacade(s) {
-    if (!s.label || s.label.startsWith('cerca') || s.label.startsWith('poco')) return;
-
-    const foot = w2s(s.x, s.y + s.h);
-    const facadeH = s.facade || 96;
-    const wallTop = foot.y - facadeH;
-    const wallW = s.w;
-    const wallX = foot.x;
-    const dusk = duskFactor();
-    const style = s.style || s.label;
-
-    longShadow(wallX + wallW / 2, foot.y + 2, wallW, facadeH);
-
-    let wall = [92, 68, 48];
-    let roofDark = '#2a1c14';
-    let roofMid = '#3d2a1f';
-    let title = '';
-    let thick = 26;
-
-    if (style === 'capela') {
-      wall = [168, 158, 142]; // whitewash / stone
-      roofDark = '#2e2834';
-      roofMid = '#4a4050';
-      title = 'Capela';
-      thick = 34;
-    } else if (style === 'cantina') {
-      wall = [96, 58, 48];
-      title = 'Cantina';
-    } else if (style === 'armazem') {
-      wall = [78, 56, 40];
-      title = 'Armazém';
-    } else if (style === 'estabulo') {
-      wall = [88, 72, 48];
-      roofMid = '#3a2e1c';
-      title = 'Estábulo';
-      thick = 22;
-    } else if (style === 'casa') {
-      wall = [110, 88, 62];
-      title = '';
-    }
-
-    drawPlankFacade(wallX, wallTop, wallW, facadeH, wall, true);
-
-    // porch beam
-    if (style === 'cantina' || style === 'armazem' || style === 'casa') {
-      ctx.fillStyle = '#2a1c14';
-      ctx.fillRect(wallX + 8, wallTop + facadeH - 32, 4, 32);
-      ctx.fillRect(wallX + wallW - 12, wallTop + facadeH - 32, 4, 32);
-      ctx.fillStyle = '#3d2a1f';
-      ctx.fillRect(wallX + 4, wallTop + facadeH - 34, wallW - 8, 5);
-      ctx.fillStyle = 'rgba(0,0,0,0.2)';
-      ctx.fillRect(wallX + 4, wallTop + facadeH - 29, wallW - 8, 3);
-    }
-
-    // doorway — dark interior void
-    const dw = Math.min(26, wallW * 0.2);
-    const dx = wallX + wallW / 2 - dw / 2;
-    const dy = wallTop + facadeH - 38;
-    const doorGrad = ctx.createLinearGradient(dx, dy, dx + dw, dy);
-    doorGrad.addColorStop(0, '#0c0806');
-    doorGrad.addColorStop(0.5, '#1a100c');
-    doorGrad.addColorStop(1, '#0a0604');
-    ctx.fillStyle = doorGrad;
-    ctx.fillRect(dx, dy, dw, 38);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(dx - 2, dy, 2, 38);
-    ctx.fillRect(dx + dw, dy, 2, 38);
-
-    if (style === 'capela') {
-      drawDirtyWindow(wallX + wallW * 0.2, wallTop + 34, dusk);
-      drawDirtyWindow(wallX + wallW * 0.72 - 11, wallTop + 34, dusk);
-      // solemn cross
-      ctx.fillStyle = '#2a2218';
-      const cx = wallX + wallW / 2, cy = wallTop + 18;
-      ctx.fillRect(cx - 1.5, cy - 12, 3, 26);
-      ctx.fillRect(cx - 8, cy - 2, 16, 3);
-    } else if (style === 'estabulo') {
-      ctx.fillStyle = 'rgba(8,6,4,0.65)';
-      ctx.fillRect(wallX + 16, wallTop + facadeH - 44, wallW - 32, 44);
-      ctx.strokeStyle = 'rgba(50,38,24,0.7)';
-      ctx.lineWidth = 2.2;
-      for (let i = 0; i < 3; i++) {
-        const ry = wallTop + 26 + i * 14;
-        ctx.beginPath();
-        ctx.moveTo(wallX + 10, ry);
-        ctx.lineTo(wallX + wallW - 10, ry);
-        ctx.stroke();
+        const x0 = tx * TILE, z0 = ty * TILE;
+        const x1 = x0 + TILE, z1 = z0 + TILE;
+        const p00 = project(x0, 0, z0);
+        const p10 = project(x1, 0, z0);
+        const p11 = project(x1, 0, z1);
+        const p01 = project(x0, 0, z1);
+        if (!p00 || !p10 || !p11 || !p01) continue;
+        const z = (p00.z + p10.z + p11.z + p01.z) * 0.25;
+        if (z > FOG_END) continue;
+        const fog = fogAlpha(z);
+        faces.push({
+          z,
+          pts: [p00, p10, p11, p01],
+          color: shadeColor(col, 0, fog * 0.85),
+          road: t === 4,
+          x0, z0,
+        });
       }
-      // posts
-      ctx.fillStyle = '#3a2a1c';
-      for (let i = 0; i < 4; i++) {
-        ctx.fillRect(wallX + 20 + i * ((wallW - 40) / 3), wallTop + facadeH - 48, 4, 48);
-      }
-    } else {
-      drawDirtyWindow(wallX + wallW * 0.16, wallTop + 26, dusk);
-      drawDirtyWindow(wallX + wallW * 0.78 - 11, wallTop + 26, dusk);
-      if (wallW > 190) drawDirtyWindow(wallX + wallW * 0.48 - 5, wallTop + 26, dusk);
     }
-
-    // hanging worn cantina sign
-    if (style === 'cantina') {
-      ctx.strokeStyle = 'rgba(40,28,18,0.7)';
-      ctx.beginPath();
-      ctx.moveTo(wallX + wallW / 2 - 20, wallTop + 8);
-      ctx.lineTo(wallX + wallW / 2 - 18, wallTop + 18);
-      ctx.moveTo(wallX + wallW / 2 + 20, wallTop + 8);
-      ctx.lineTo(wallX + wallW / 2 + 18, wallTop + 18);
-      ctx.stroke();
-      ctx.fillStyle = '#3a2a1c';
-      ctx.fillRect(wallX + wallW / 2 - 32, wallTop + 16, 64, 16);
-      ctx.strokeStyle = 'rgba(120,95,65,0.4)';
-      ctx.strokeRect(wallX + wallW / 2 - 32, wallTop + 16, 64, 16);
-      ctx.fillStyle = 'rgba(190,160,120,0.7)';
-      ctx.font = '600 10px system-ui,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('CANTINA', wallX + wallW / 2, wallTop + 27);
-    }
-
-    drawRoofCinematic(wallX, wallTop, wallW, thick, roofDark, roofMid);
-
-    if (title && style !== 'cantina') {
-      weatheredSign(wallX + wallW / 2, wallTop - thick - 2, title);
-    }
-  }
-
-  function drawFence(s) {
-    const p0 = w2s(s.x, s.y);
-    ctx.fillStyle = '#3a2a1c';
-    if (s.w > s.h) {
-      ctx.fillRect(p0.x, p0.y - 12, s.w, 3);
-      ctx.fillRect(p0.x, p0.y - 5, s.w, 3);
-      for (let i = 0; i < s.w; i += 26) {
-        ctx.fillRect(p0.x + i, p0.y - 16, 4, 20);
-      }
-      // shadow
-      ctx.fillStyle = 'rgba(20,12,6,0.2)';
-      ctx.fillRect(p0.x, p0.y + 1, s.w, 3);
-    } else {
-      for (let i = 0; i < s.h; i += 18) {
-        const pp = w2s(s.x, s.y + i);
-        ctx.fillStyle = '#3a2a1c';
-        ctx.fillRect(pp.x, pp.y - 16, 4, 20);
+    faces.sort((a, b) => b.z - a.z);
+    for (const f of faces) {
+      fillPoly(f.pts, f.color);
+      if (f.road) {
+        // dashed center line when roughly aligned
+        const mid = project(f.x0 + TILE * 0.5, 0.5, f.z0 + TILE * 0.5);
+        if (mid && ((f.x0 / TILE) | 0) % 2 === 0) {
+          const a = project(f.x0 + TILE * 0.45, 0.4, f.z0 + 4);
+          const b = project(f.x0 + TILE * 0.55, 0.4, f.z0 + TILE - 4);
+          if (a && b && fogAlpha(mid.z) < 0.7) {
+            ctx.strokeStyle = `rgba(210,190,150,${0.45 * (1 - fogAlpha(mid.z))})`;
+            ctx.lineWidth = Math.max(1, mid.sc * 0.8);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
       }
     }
   }
 
-  function drawWell() {
-    const { TILE } = FronteiraWorld;
-    const cx = 20.5 * TILE, cy = 14.8 * TILE;
-    const p = w2s(cx, cy);
-
-    longShadow(p.x, p.y + 4, 48, 40);
-
-    // stone body with mortar variation
-    for (let i = 0; i < 10; i++) {
-      const n = hash2(i, 3);
-      const shade = (n - 0.5) * 22;
-      ctx.fillStyle = `rgb(${(90 + shade)|0},${(88 + shade)|0},${(78 + shade * 0.7)|0})`;
-      const ang = (i / 10) * Math.PI * 2;
-      // approximate ring blocks on front
-      ctx.fillRect(p.x - 22 + (i % 5) * 9, p.y - 2 + ((i / 5) | 0) * 8, 8, 7);
-    }
-    ctx.fillStyle = '#5a584e';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 23, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#4a4840';
-    ctx.fillRect(p.x - 23, p.y - 1, 46, 14);
-    ctx.fillStyle = '#6a6860';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y - 1, 23, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // dark water depth
-    const wg = ctx.createRadialGradient(p.x, p.y - 1, 2, p.x, p.y - 1, 14);
-    wg.addColorStop(0, '#2a4550');
-    wg.addColorStop(0.6, '#1a3038');
-    wg.addColorStop(1, '#0e181c');
-    ctx.fillStyle = wg;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y - 1, 14, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (!reducedMotion) {
-      ctx.fillStyle = `rgba(160,190,200,${0.12 + Math.sin(bobT * 1.8) * 0.06})`;
-      ctx.beginPath();
-      ctx.ellipse(p.x - 3, p.y - 2, 4, 1.5, 0.15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // posts + crossbar + rope + bucket
-    ctx.fillStyle = '#2e2218';
-    ctx.fillRect(p.x - 20, p.y - 34, 4, 34);
-    ctx.fillRect(p.x + 16, p.y - 34, 4, 34);
-    ctx.fillStyle = '#1e1610';
-    ctx.fillRect(p.x - 22, p.y - 36, 44, 5);
-    ctx.strokeStyle = 'rgba(60,45,30,0.7)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 34);
-    ctx.lineTo(p.x, p.y - 16);
-    ctx.stroke();
-    ctx.fillStyle = '#3a2a1c';
-    ctx.fillRect(p.x - 5, p.y - 16, 10, 7);
-    ctx.strokeStyle = 'rgba(20,12,8,0.5)';
-    ctx.strokeRect(p.x - 5, p.y - 16, 10, 7);
-
-    weatheredSign(p.x, p.y - 44, 'Poço');
-  }
-
-  /* ——— characters (adult proportions) ——— */
-  function drawChar(wx, wy, palette, opts) {
+  /* ——— boxes ——— */
+  function boxFaces(x, y0, z, w, h, d, color, opts) {
     opts = opts || {};
-    const p = w2s(wx, wy);
-    const facing = opts.facing || 1;
-    const moving = !!opts.moving;
-    const breath = (!reducedMotion && running && !paused && !moving)
-      ? Math.sin(bobT * 2.4 + wx * 0.02) * 0.6 : 0;
-    const walk = moving && !reducedMotion ? Math.sin(walkPhase + (opts.phase || 0)) : 0;
-    const feetY = p.y;
-
-    // long soft ground shadow
-    ctx.fillStyle = 'rgba(18, 10, 5, 0.32)';
-    ctx.beginPath();
-    ctx.ellipse(p.x - SUN.x * 8, feetY + 2, 12, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(18, 10, 5, 0.14)';
-    ctx.beginPath();
-    ctx.ellipse(p.x - SUN.x * 16, feetY + 5, 16, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const skin = palette.skin || '#b89570';
-    const shirt = palette.shirt || '#5a4a3a';
-    const pants = palette.pants || '#2e2a24';
-    const hat = palette.hat || '#2a2218';
-    const coat = palette.coat || null;
-
-    const legSwing = walk * 3.5;
-    // legs
-    ctx.fillStyle = pants;
-    ctx.fillRect(p.x - 5 + legSwing, feetY - 14, 4, 13);
-    ctx.fillRect(p.x + 1 - legSwing, feetY - 14, 4, 13);
-    ctx.fillStyle = '#1a140e';
-    ctx.fillRect(p.x - 6 + legSwing, feetY - 2, 5, 2.5);
-    ctx.fillRect(p.x + 1 - legSwing, feetY - 2, 5, 2.5);
-
-    // torso (taller adult)
-    const torsoTop = feetY - 28 + breath;
-    ctx.fillStyle = coat || shirt;
-    ctx.fillRect(p.x - 7, torsoTop, 14, 15);
-    // vest / coat lapel hint
-    if (opts.isPlayer || coat) {
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.fillRect(p.x - 1, torsoTop, 2, 15);
-    }
-    // skirt suggestion for clara/rita
-    if (palette.skirt) {
-      ctx.fillStyle = palette.skirt;
-      ctx.beginPath();
-      ctx.moveTo(p.x - 8, feetY - 16);
-      ctx.lineTo(p.x + 8, feetY - 16);
-      ctx.lineTo(p.x + 10, feetY - 6);
-      ctx.lineTo(p.x - 10, feetY - 6);
-      ctx.closePath();
-      ctx.fill();
+    const out = [];
+    // 8 corners
+    const corners = [
+      [x, y0, z], [x + w, y0, z], [x + w, y0, z + d], [x, y0, z + d],
+      [x, y0 + h, z], [x + w, y0 + h, z], [x + w, y0 + h, z + d], [x, y0 + h, z + d],
+    ];
+    const P = corners.map((c) => project(c[0], c[1], c[2]));
+    const faces = [
+      { idx: [4, 5, 6, 7], face: 0 }, // top
+      { idx: [0, 1, 5, 4], face: 2 }, // -Z
+      { idx: [3, 2, 6, 7], face: 2 }, // +Z
+      { idx: [0, 3, 7, 4], face: 3 }, // -X
+      { idx: [1, 2, 6, 5], face: 1 }, // +X sunnier
+    ];
+    // choose lit side by sun
+    for (const f of faces) {
+      const pts = f.idx.map((i) => P[i]);
+      if (pts.some((p) => !p)) continue;
+      // backface: skip if average screen cross roughly wrong — simple: use cam-space normal via z of center
+      const zAvg = avgZ(pts);
+      const fog = fogAlpha(zAvg);
+      let face = f.face;
+      // sun bias: +X more lit
+      if (f.idx[0] === 1) face = 1;
+      if (f.idx[0] === 0 && f.idx[1] === 3) face = 3;
+      out.push({
+        z: zAvg,
+        pts,
+        color: shadeColor(color, face, fog),
+        kind: 'box',
+      });
     }
 
-    // arms
-    const armSwing = walk * 2.5;
-    ctx.fillStyle = skin;
-    ctx.fillRect(p.x - 10, torsoTop + 2 + armSwing, 3.5, 11);
-    ctx.fillRect(p.x + 6.5, torsoTop + 2 - armSwing, 3.5, 11);
-    // sleeve cuffs
-    ctx.fillStyle = shirt;
-    ctx.fillRect(p.x - 10, torsoTop + 1, 3.5, 4);
-    ctx.fillRect(p.x + 6.5, torsoTop + 1, 3.5, 4);
-
-    // head (smaller vs body ~1:3.5)
-    const hy = torsoTop - 7;
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.arc(p.x, hy, 5.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // wide-brim hat + crown shadow on face
-    ctx.fillStyle = hat;
-    ctx.beginPath();
-    ctx.ellipse(p.x, hy - 3, 11, 2.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillRect(p.x - 5, hy - 10, 10, 7);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, hy - 1, 5, 1.5, 0, 0, Math.PI);
-    ctx.fill();
-
-    // hat cast shadow on shoulder
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fillRect(p.x - 7, torsoTop, 14, 3);
-  }
-
-  function npcPalette(n) {
-    const base = {
-      skin: n.skin, shirt: n.shirt, pants: n.pants, hat: n.hat, color: n.color,
-    };
-    if (n.id === 'dona_clara') { base.skirt = '#5a3840'; base.coat = null; }
-    if (n.id === 'rita') { base.skirt = '#4a3840'; }
-    if (n.id === 'seu_ze') { base.coat = '#4a3a2c'; }
-    if (n.id === 'padre_elias') { base.coat = '#222228'; base.shirt = '#2a2a30'; }
-    if (n.id === 'tiao') { base.coat = '#4a4838'; }
-    return base;
-  }
-
-  function drawNameplate(wx, wy, name) {
-    const p = w2s(wx, wy);
-    weatheredSign(p.x, p.y - CHAR_H - 4, name);
-  }
-
-  function drawHorseshoe(it) {
-    if (it.collected) return;
-    const p = w2s(it.x + it.w / 2, it.y + it.h / 2);
-    ctx.fillStyle = 'rgba(15,10,5,0.25)';
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 3, 8, 2.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#8a7048';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0.35, Math.PI - 0.35);
-    ctx.stroke();
-  }
-
-  function drawDust() {
-    if (reducedMotion || !dust.length) return;
-    const vw = canvas.width, vh = canvas.height;
-    // sparse dust columns (heat)
-    for (const d of dust) {
-      d.y -= d.sp * 0.016;
-      d.x += d.drift * 0.016;
-      if (d.y < 0) { d.y = 1; d.x = Math.random(); }
-      if (d.x < 0 || d.x > 1) d.drift *= -1;
-      ctx.fillStyle = `rgba(200,175,140,${d.a})`;
-      ctx.beginPath();
-      ctx.arc(d.x * vw, vh * 0.2 + d.y * vh * 0.55, d.s, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function postProcess() {
-    const vw = canvas.width, vh = canvas.height;
-    const dusk = duskFactor();
-
-    // cinematic color grade overlay
-    ctx.fillStyle = `rgba(40, 22, 10, ${0.08 + dusk * 0.1})`;
-    ctx.fillRect(0, 0, vw, vh);
-    // cool shadow crush in corners via vignette
-    const vig = ctx.createRadialGradient(vw * 0.5, vh * 0.45, vh * 0.2, vw * 0.5, vh * 0.5, vh * 0.85);
-    vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(0.65, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, `rgba(12, 6, 2, ${0.42 + dusk * 0.12})`);
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, vw, vh);
-
-    // warm highlight wash (sun side)
-    const wash = ctx.createLinearGradient(0, 0, vw * 0.5, vh);
-    wash.addColorStop(0, `rgba(255, 190, 120, ${0.04 + dusk * 0.03})`);
-    wash.addColorStop(1, 'rgba(255,190,120,0)');
-    ctx.fillStyle = wash;
-    ctx.fillRect(0, 0, vw, vh);
-
-    if (!reducedMotion) {
-      ensureGrain();
-      if (grainPat) {
-        ctx.globalAlpha = 0.07;
-        ctx.fillStyle = grainPat;
-        ctx.fillRect(0, 0, vw, vh);
-        ctx.globalAlpha = 1;
+    // hard ground shadow (flat projected parallelogram)
+    if (!opts.noShadow) {
+      const sx = SUN.x * 40, sz = SUN.z * 40;
+      const sc = [
+        [x + sx, 0.2, z + sz],
+        [x + w + sx, 0.2, z + sz],
+        [x + w + sx, 0.2, z + d + sz],
+        [x + sx, 0.2, z + d + sz],
+      ].map((c) => project(c[0], c[1], c[2]));
+      if (!sc.some((p) => !p)) {
+        const zAvg = avgZ(sc) + 0.5;
+        const fog = fogAlpha(zAvg);
+        const a = 0.45 * (1 - fog * 0.7);
+        out.push({
+          z: zAvg + 0.01,
+          pts: sc,
+          color: `rgba(15,8,4,${a})`,
+          kind: 'shadow',
+        });
       }
     }
+    return out;
+  }
+
+  function windowGrid(x, y0, z, w, h, d, color) {
+    // paint dark window rects on the camera-facing wall (approximate: both long faces)
+    const faces = [];
+    const cols = Math.max(2, Math.floor(w / 28));
+    const rows = Math.max(2, Math.floor(h / 32));
+    const inset = 10;
+    // front (+Z) and -Z walls
+    for (const side of [0, 1]) {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const wx = x + inset + col * ((w - inset * 2) / cols) + 4;
+          const wy = y0 + inset + row * ((h - inset * 2) / rows) + 4;
+          const ww = Math.max(6, (w - inset * 2) / cols - 10);
+          const wh = Math.max(8, (h - inset * 2) / rows - 10);
+          const zz = side === 0 ? z + d + 0.5 : z - 0.5;
+          const p0 = project(wx, wy, zz);
+          const p1 = project(wx + ww, wy, zz);
+          const p2 = project(wx + ww, wy + wh, zz);
+          const p3 = project(wx, wy + wh, zz);
+          if (!p0 || !p1 || !p2 || !p3) continue;
+          const zAvg = avgZ([p0, p1, p2, p3]);
+          const fog = fogAlpha(zAvg);
+          faces.push({
+            z: zAvg - 0.2,
+            pts: [p0, p1, p2, p3],
+            color: shadeColor('#1a120c', 3, fog),
+            kind: 'win',
+          });
+        }
+      }
+    }
+    return faces;
+  }
+
+  function signSlab(cx, y, cz, text, color) {
+    const w = Math.min(70, text.length * 8 + 16);
+    const h = 14, d = 4;
+    const faces = boxFaces(cx - w / 2, y, cz, w, h, d, color || '#3a2a1c', { noShadow: true });
+    return faces;
+  }
+
+  function drawLowPolyPerson(wx, wz, ang, palette, isPlayer) {
+    const faces = [];
+    const s = Math.sin(ang), c = Math.cos(ang);
+    // local offsets → world
+    function lp(lx, ly, lz) {
+      return {
+        x: wx + lx * c + lz * s,
+        y: ly,
+        z: wz - lx * s + lz * c,
+      };
+    }
+    const parts = [
+      // legs
+      { o: lp(-4, 0, -2), w: 5, h: 14, d: 5, col: palette.pants },
+      { o: lp(2, 0, -2), w: 5, h: 14, d: 5, col: palette.pants },
+      // torso
+      { o: lp(-7, 14, -4), w: 14, h: 16, d: 8, col: palette.torso },
+      // head
+      { o: lp(-4.5, 30, -3.5), w: 9, h: 9, d: 8, col: palette.head },
+      // hat brim
+      { o: lp(-8, 38, -6), w: 16, h: 2, d: 14, col: palette.hat },
+      // hat crown
+      { o: lp(-5, 40, -4), w: 10, h: 5, d: 9, col: palette.hat },
+    ];
+    for (const p of parts) {
+      faces.push(...boxFaces(p.o.x, p.o.y, p.o.z, p.w, p.h, p.d, p.col, { noShadow: !isPlayer }));
+    }
+    // player gets one hard shadow under feet
+    if (isPlayer) {
+      faces.push(...boxFaces(wx - 10, 0.1, wz - 8, 20, 0.2, 16, '#1a1008', { noShadow: true }).map((f) => {
+        f.color = 'rgba(10,6,2,0.4)';
+        f.z += 0.5;
+        return f;
+      }));
+    }
+    return faces;
+  }
+
+  function gatherScene() {
+    const faces = [];
+
+    // buildings
+    for (const s of FronteiraWorld.solids) {
+      if (!s.label || s.label.startsWith('cerca') || s.label.startsWith('poco')) continue;
+      const h = s.height3d || 100;
+      const col = s.color || '#8a6a48';
+      faces.push(...boxFaces(s.x, 0, s.y, s.w, h, s.h, col));
+      faces.push(...windowGrid(s.x, 0, s.y, s.w, h, s.h, col));
+
+      // distinct sign slabs
+      const style = s.style || s.label;
+      const cx = s.x + s.w / 2;
+      const cz = s.y + s.h + 2;
+      if (style === 'cantina') faces.push(...signSlab(cx, h * 0.55, cz, 'CANTINA', '#3a2418'));
+      if (style === 'armazem') faces.push(...signSlab(cx, h * 0.55, cz, 'ARMAZEM', '#2a1c10'));
+      if (style === 'capela') {
+        // simple cross on top
+        faces.push(...boxFaces(cx - 2, h, s.y + s.h / 2 - 2, 4, 28, 4, '#2a2218', { noShadow: true }));
+        faces.push(...boxFaces(cx - 10, h + 16, s.y + s.h / 2 - 2, 20, 4, 4, '#2a2218', { noShadow: true }));
+      }
+      if (style === 'estabulo') faces.push(...signSlab(cx, h * 0.5, cz, 'ESTABULO', '#3a3020'));
+    }
+
+    // fences as thin boxes
+    for (const s of FronteiraWorld.solids) {
+      if (!s.label || !s.label.startsWith('cerca')) continue;
+      faces.push(...boxFaces(s.x, 0, s.y, Math.max(4, s.w), 18, Math.max(4, s.h), '#4a3828'));
+    }
+
+    // well
+    {
+      const { TILE } = FronteiraWorld;
+      const cx = 20.5 * TILE, cz = 14.8 * TILE;
+      faces.push(...boxFaces(cx - 18, 0, cz - 18, 36, 22, 36, '#6a6860'));
+      faces.push(...boxFaces(cx - 12, 22, cz - 12, 24, 2, 24, '#3a5058', { noShadow: true }));
+      faces.push(...boxFaces(cx - 16, 22, cz - 2, 4, 28, 4, '#3a2a1c', { noShadow: true }));
+      faces.push(...boxFaces(cx + 12, 22, cz - 2, 4, 28, 4, '#3a2a1c', { noShadow: true }));
+      faces.push(...boxFaces(cx - 16, 48, cz - 2, 32, 4, 4, '#2a1c14', { noShadow: true }));
+    }
+
+    // scrub trees (cone+trunk) near mato
+    const { TILE, W, H, ground } = FronteiraWorld;
+    const cx = Math.floor(player.x / TILE), cy = Math.floor(player.y / TILE);
+    for (let ty = cy - 14; ty <= cy + 14; ty++) {
+      for (let tx = cx - 14; tx <= cx + 14; tx++) {
+        if (ty < 0 || tx < 0 || ty >= H || tx >= W) continue;
+        if (ground[ty][tx] !== 2) continue;
+        if ((tx * 13 + ty * 7) % 11 !== 0) continue;
+        const x = tx * TILE + 10, z = ty * TILE + 10;
+        faces.push(...boxFaces(x + 4, 0, z + 4, 6, 16, 6, '#4a3828', { noShadow: true }));
+        // green block as foliage (cone approximated as stacked boxes)
+        faces.push(...boxFaces(x, 14, z, 14, 18, 14, '#4a6a38'));
+        faces.push(...boxFaces(x + 2, 30, z + 2, 10, 10, 10, '#3a5a2e', { noShadow: true }));
+      }
+    }
+
+    // horseshoe marker
+    for (const it of FronteiraWorld.interactables) {
+      if (it.kind !== 'item' || it.collected) continue;
+      faces.push(...boxFaces(it.x, 0, it.y, 14, 4, 14, '#a88858'));
+      // mission beam
+      faces.push(...boxFaces(it.x + 4, 0, it.y + 4, 6, 70, 6, '#c4a050', { noShadow: true }).map((f) => {
+        f.color = 'rgba(210,170,70,0.28)';
+        return f;
+      }));
+    }
+
+    // interact beam near objective NPCs lightly — skip to avoid GTA vibe spam
+
+    // NPCs
+    for (const n of FronteiraWorld.npcs) {
+      const pal = {
+        torso: n.shirt || n.color || '#6a5038',
+        pants: n.pants || '#2e2a24',
+        head: n.skin || '#b89570',
+        hat: n.hat || '#2a2218',
+      };
+      // face toward player roughly
+      const ang = Math.atan2(player.x - n.x, player.y - n.y);
+      faces.push(...drawLowPolyPerson(n.x, n.y, ang, pal, false));
+    }
+
+    // Player — behind cam so appears lower-center
+    faces.push(...drawLowPolyPerson(player.x, player.y, player.ang, {
+      torso: '#4a5a48',
+      pants: '#1e1e24',
+      head: '#c4a07a',
+      hat: '#1a1610',
+    }, true));
+
+    return faces;
+  }
+
+  function drawZoneTitle() {
+    if (zoneFade <= 0 || !zoneName) return;
+    const a = Math.min(1, zoneFade);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.font = '800 28px system-ui,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(20,10,4,0.85)';
+    ctx.fillStyle = '#f2e6d4';
+    const x = canvas.width * 0.5, y = canvas.height * 0.22;
+    ctx.strokeText(zoneName, x, y);
+    ctx.fillText(zoneName, x, y);
+    ctx.restore();
   }
 
   function render() {
     const vw = canvas.width, vh = canvas.height;
-    ctx.fillStyle = '#2a2018';
-    ctx.fillRect(0, 0, vw, vh);
-
     drawSky();
-    drawGround();
+    drawGroundPlane();
 
-    const list = [];
+    const faces = gatherScene();
+    faces.sort((a, b) => b.z - a.z);
+    for (const f of faces) fillPoly(f.pts, f.color);
 
-    for (const s of FronteiraWorld.solids) {
-      if (s.label && s.label.startsWith('cerca')) {
-        list.push({ y: s.y + s.h, draw: () => drawFence(s) });
-      } else if (s.label && s.label.startsWith('poco')) {
-        /* well once */
-      } else if (s.label) {
-        list.push({ y: s.y + s.h, draw: () => drawBuildingFacade(s) });
-      }
-    }
+    // distance haze veil
+    const haze = ctx.createLinearGradient(0, vh * 0.35, 0, vh * 0.55);
+    haze.addColorStop(0, `rgba(${FOG.r},${FOG.g},${FOG.b},0.35)`);
+    haze.addColorStop(1, `rgba(${FOG.r},${FOG.g},${FOG.b},0)`);
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, vw, vh * 0.6);
 
-    list.push({ y: 14.8 * FronteiraWorld.TILE + 20, draw: drawWell });
-
-    for (const it of FronteiraWorld.interactables) {
-      if (it.kind === 'item') list.push({ y: it.y + it.h, draw: () => drawHorseshoe(it) });
-    }
-
-    FronteiraWorld.npcs.forEach((n, i) => {
-      list.push({
-        y: n.y,
-        draw: () => {
-          drawChar(n.x, n.y, npcPalette(n), { phase: i * 1.7 });
-          drawNameplate(n.x, n.y, n.name);
-        },
-      });
-    });
-
-    list.push({
-      y: player.y,
-      draw: () => {
-        drawChar(player.x, player.y, {
-          skin: '#c4a07a',
-          shirt: '#4a5548',
-          pants: '#2a2a30',
-          hat: '#2a2218',
-          coat: '#3a4038',
-        }, { isPlayer: true, moving: player.moving, facing: player.facing });
-      },
-    });
-
-    list.sort((a, b) => a.y - b.y);
-    for (const d of list) d.draw();
-
-    drawDust();
-    postProcess();
+    drawZoneTitle();
   }
 
   function frame(t) {
@@ -989,23 +652,22 @@ const FronteiraGame = (() => {
     lastT = t;
 
     if (running && !paused && !won) {
-      if (FronteiraInput.consumePause()) {
-        pause();
-      } else {
+      if (FronteiraInput.consumePause()) pause();
+      else {
         const dialogOpen = !document.getElementById('screen-dialog').classList.contains('hidden');
         if (!dialogOpen) {
           move(dt);
-          if (!reducedMotion) {
-            dayT += dt * 0.01;
-            bobT += dt;
-          }
           updateNear();
+          updateZone(dt);
+          if (!reducedMotion) bobT += dt;
           if (FronteiraInput.consumeInteract()) tryInteract();
         } else if (FronteiraInput.consumeInteract()) {
           FronteiraUI.advanceDialog();
         }
-        updateCamera();
+        syncCam(1 - Math.exp(-dt * 10));
       }
+    } else {
+      syncCam(0.2);
     }
 
     render();
@@ -1013,20 +675,15 @@ const FronteiraGame = (() => {
   }
 
   function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    canvas.width = w;
-    canvas.height = h;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    grainPat = null; // recreate for new ctx if needed
-    updateCamera();
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
   }
 
   function start() {
     spawn();
-    running = true;
-    paused = false;
-    won = false;
+    running = true; paused = false; won = false;
     FronteiraUI.hideOverlays();
     FronteiraUI.setHudVisible(true);
     FronteiraUI.setTouchVisible(true);
@@ -1040,18 +697,14 @@ const FronteiraGame = (() => {
     paused = true;
     FronteiraUI.showPause();
   }
-
   function resume() {
     paused = false;
     FronteiraUI.hidePause();
     FronteiraInput.releaseAllDirs();
     lastT = performance.now();
   }
-
   function stopToMenu() {
-    running = false;
-    paused = false;
-    won = false;
+    running = false; paused = false; won = false;
     FronteiraUI.showMenu();
   }
 
@@ -1062,7 +715,6 @@ const FronteiraGame = (() => {
     resize();
     window.addEventListener('resize', resize);
     spawn();
-    updateCamera();
     requestAnimationFrame(frame);
   }
 
