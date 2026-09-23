@@ -18,9 +18,7 @@ const FronteiraGame = (() => {
   let reducedMotion = false;
   let shadowsOn = true;
   let player = { x: 0, z: 0, ang: 0, moving: false };
-  let camPos = new THREE.Vector3();
-  let lookPos = new THREE.Vector3();
-  let _tmp = new THREE.Vector3();
+  let camPos, lookPos, _tmp;
   let windowTex = null;
   let roadMat, dirtMat, asphaltMat;
   let wagonGroup;
@@ -643,8 +641,23 @@ const FronteiraGame = (() => {
     }
     if (typeof THREE === 'undefined') {
       console.error('THREE não carregou');
+      const panel = document.querySelector('#screen-menu .panel');
+      if (panel) {
+        const err = document.createElement('p');
+        err.className = 'tagline';
+        err.style.color = '#e85d4c';
+        err.style.fontWeight = '700';
+        err.textContent = 'Erro: Three.js não carregou. Recarregue a página ou limpe o cache.';
+        const tag = panel.querySelector('.tagline');
+        if (tag) tag.replaceWith(err); else panel.appendChild(err);
+        const play = panel.querySelector('#btn-play');
+        if (play) play.disabled = true;
+      }
       return;
     }
+    camPos = new THREE.Vector3();
+    lookPos = new THREE.Vector3();
+    _tmp = new THREE.Vector3();
     setupThree();
     resize();
     window.addEventListener('resize', resize);
