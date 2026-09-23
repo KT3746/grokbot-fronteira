@@ -1,5 +1,5 @@
 /* FRONTEIRA — layout canyon (rua principal) + NPCs/quests */
-const FronteiraWorld = (() => {
+export const FronteiraWorld = (() => {
   // Units ≈ meters. X = L/R, Z = ao longo da rua (norte+).
   const ROAD_HALF = 7;
   const BUILD_GAP = 0.4;

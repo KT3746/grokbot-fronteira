@@ -1,5 +1,5 @@
 /* FRONTEIRA — overlays, HUD, diálogos */
-const FronteiraUI = (() => {
+export const FronteiraUI = (() => {
   const els = {};
 
   function init() {

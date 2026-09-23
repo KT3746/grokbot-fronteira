@@ -1,5 +1,5 @@
 /* FRONTEIRA — teclado + D-pad + Interagir */
-const FronteiraInput = (() => {
+export const FronteiraInput = (() => {
   const keys = Object.create(null);
   const touchDirs = { up: false, down: false, left: false, right: false };
   const DIR_VEC = {

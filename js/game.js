@@ -1,5 +1,11 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) */
-const FronteiraGame = (() => {
+import * as THREE from 'three';
+import { FronteiraAudio } from './audio.js';
+import { FronteiraWorld } from './world.js';
+import { FronteiraInput } from './input.js';
+import { FronteiraUI } from './ui.js';
+
+export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
   const SPEED = 9.5;
   const TURN = 4.2;
@@ -492,6 +498,23 @@ const FronteiraGame = (() => {
     scene.add(sun);
     scene.add(sun.target);
 
+
+    // HUD chip: confirm WebGL boot (never use 2d on #game)
+    {
+      let chip = document.getElementById('webgl-chip');
+      if (!chip) {
+        chip = document.createElement('div');
+        chip.id = 'webgl-chip';
+        chip.textContent = 'WebGL · r160';
+        chip.setAttribute('aria-hidden', 'true');
+        chip.style.cssText = 'position:absolute;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:6;font:600 10px/1.2 system-ui,sans-serif;letter-spacing:0.04em;color:rgba(242,230,212,0.75);background:rgba(30,18,12,0.65);border:1px solid rgba(196,165,116,0.35);border-radius:999px;padding:4px 8px;pointer-events:none;text-shadow:0 1px 1px #000;';
+        const app = document.getElementById('app');
+        if (app) app.appendChild(chip);
+      } else {
+        chip.textContent = 'WebGL · r160';
+      }
+    }
+
     clock = new THREE.Clock();
     buildWorld();
   }
@@ -639,15 +662,15 @@ const FronteiraGame = (() => {
     if (isMobile) {
       // keep shadows but lower res already 1024
     }
-    if (typeof THREE === 'undefined') {
-      console.error('THREE não carregou');
+    if (!THREE || !THREE.WebGLRenderer) {
+      console.error('THREE ESM não carregou');
       const panel = document.querySelector('#screen-menu .panel');
       if (panel) {
         const err = document.createElement('p');
         err.className = 'tagline';
         err.style.color = '#e85d4c';
         err.style.fontWeight = '700';
-        err.textContent = 'Erro: Three.js não carregou. Recarregue a página ou limpe o cache.';
+        err.textContent = 'Erro: Three.js (ESM) não carregou. Recarregue a página ou limpe o cache.';
         const tag = panel.querySelector('.tagline');
         if (tag) tag.replaceWith(err); else panel.appendChild(err);
         const play = panel.querySelector('#btn-play');
