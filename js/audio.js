@@ -120,7 +120,20 @@ export const FronteiraAudio = (() => {
     startAmbience();
   }
 
+  function suspend() {
+    if (ctx && ctx.state === 'running') {
+      try { ctx.suspend(); } catch (_) { /* ok */ }
+    }
+  }
+
+  function resume() {
+    if (!muted && ctx && ctx.state === 'suspended') {
+      try { ctx.resume(); } catch (_) { /* ok */ }
+    }
+  }
+
   return {
     unlock, setMuted, isMuted, loadMute, footstep, interactChime, questDone, startAmbience,
+    suspend, resume,
   };
 })();
