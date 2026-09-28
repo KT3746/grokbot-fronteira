@@ -48,6 +48,7 @@ html, body {
   height: 100%;
   background: #4a3828;
   touch-action: none;
+  pointer-events: none; /* toque cai em #app / controles; HUD fica de fora */
 }
 
 .hidden { display: none !important; }
@@ -105,6 +106,7 @@ html, body {
   border: 1px solid rgba(196, 165, 116, 0.45);
   color: var(--cream);
   width: 44px; height: 44px;
+  min-width: 44px; min-height: 44px;
   border-radius: 12px;
   font-size: 1rem;
   cursor: pointer;
@@ -166,6 +168,8 @@ html, body {
 .pad {
   width: var(--pad);
   height: var(--pad);
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 16px;
   border: 1.5px solid rgba(196, 165, 116, 0.5);
   background: rgba(45, 28, 18, 0.45);
@@ -194,6 +198,8 @@ html, body {
   pointer-events: auto;
   width: var(--act);
   height: var(--act);
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: 2.5px solid rgba(196, 165, 116, 0.8);
   background: radial-gradient(circle at 40% 35%, rgba(196,165,116,0.42), rgba(45,28,18,0.5));
@@ -220,17 +226,40 @@ html, body {
   box-shadow: 0 0 28px rgba(232, 184, 106, 0.45), inset 0 0 16px rgba(196, 165, 116, 0.18);
 }
 
-@media (max-width: 420px) {
-  :root { --pad: 58px; --act: 100px; }
-  .hud { font-size: 0.82rem; }
-  .icon-btn { width: 42px; height: 42px; }
+/* Portrait estreito (~390px): HUD compacto, alvos ≥44px */
+@media (max-width: 420px), (orientation: portrait) and (max-width: 430px) {
+  :root { --pad: 56px; --act: 96px; }
+  .hud { font-size: 0.82rem; padding-top: calc(8px + var(--safe-t)); }
+  .hud-left { padding: 5px 10px; max-width: min(72vw, 260px); }
+  .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
   .interact-btn { font-size: 0.78rem; }
+  .hint-bar { font-size: 0.68rem; }
 }
 
 @media (max-height: 700px) and (max-width: 500px) {
   :root { --pad: 52px; --act: 88px; }
   .dpad { bottom: calc(10px + var(--safe-b)); gap: 4px; }
   .interact-btn { bottom: calc(14px + var(--safe-b)); font-size: 0.72rem; }
+  .pad, .interact-btn { min-width: 44px; min-height: 44px; }
+}
+
+/* Paisagem baixa (~390px de altura) */
+@media (orientation: landscape) and (max-height: 430px) {
+  :root { --pad: 44px; --act: 72px; }
+  .hud {
+    font-size: 0.8rem;
+    padding: calc(4px + var(--safe-t)) 8px 4px;
+    padding-left: calc(8px + var(--safe-l));
+    padding-right: calc(8px + var(--safe-r));
+  }
+  .hud-left { padding: 3px 7px; max-width: min(55vw, 220px); }
+  .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .hint-bar { top: calc(48px + var(--safe-t)); font-size: 0.62rem; padding: 3px 10px; }
+  .dpad { bottom: calc(6px + var(--safe-b)); gap: 4px; left: calc(6px + var(--safe-l)); }
+  .interact-btn { bottom: calc(8px + var(--safe-b)); font-size: 0.72rem; }
+  .panel { padding: 14px 14px 12px; max-height: min(92dvh, 360px); overflow: auto; }
+  .logo { font-size: clamp(1.8rem, 8vw, 2.4rem); margin-bottom: 4px; }
+  .btn { min-height: 44px; padding: 10px 14px; }
 }
 
 @media (min-width: 900px) and (pointer: fine) {
@@ -298,6 +327,7 @@ html, body {
   margin: 8px 0;
   padding: 14px 18px;
   min-height: 48px;
+  min-width: 44px;
   border-radius: 12px;
   border: 1px solid rgba(196, 165, 116, 0.4);
   background: rgba(70, 48, 32, 0.95);
@@ -350,7 +380,10 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn, .pad, .interact-btn, .icon-btn { transition: none !important; }
+  .btn, .pad, .interact-btn, .icon-btn { transition: none !important; animation: none !important; }
+  .btn:active, .pad:active, .pad.is-down, .interact-btn:active, .interact-btn.is-down, .icon-btn:active {
+    transform: none !important;
+  }
   .overlay { backdrop-filter: none; }
   .hud-left, .pad, .interact-btn { backdrop-filter: none; }
 }

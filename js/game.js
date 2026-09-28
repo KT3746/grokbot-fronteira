@@ -1,9 +1,9 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js';
-import { FronteiraWorld } from './world.js';
-import { FronteiraInput } from './input.js';
-import { FronteiraUI } from './ui.js';
+import { FronteiraAudio } from './audio.js?v=202609281311';
+import { FronteiraWorld } from './world.js?v=202609281311';
+import { FronteiraInput } from './input.js?v=202609281311';
+import { FronteiraUI } from './ui.js?v=202609281311';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -790,7 +790,8 @@ export const FronteiraGame = (() => {
     camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 280);
 
     renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-    const dprCap = isLowEnd ? 1.5 : 2;
+    /* Cap phone ~1.25 (mesmo bar ECO/MERCADINHO); desktop até 1.5. */
+    const dprCap = isLowEnd ? 1.25 : 1.5;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -901,6 +902,12 @@ export const FronteiraGame = (() => {
   }
 
   function frame() {
+    /* Aba/app oculta: não simula nem renderiza (dt efetivo = 0). */
+    if (document.hidden) {
+      clock.getDelta();
+      requestAnimationFrame(frame);
+      return;
+    }
     const dt = Math.min(0.05, clock.getDelta());
     if (running && !paused && !won) {
       if (FronteiraInput.consumePause()) pause();
@@ -924,9 +931,12 @@ export const FronteiraGame = (() => {
   }
 
   function resize() {
+    if (!renderer || !camera) return;
     const w = window.innerWidth, h = window.innerHeight;
-    camera.aspect = w / h;
+    camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
+    const dprCap = isLowEnd ? 1.25 : 1.5;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
     renderer.setSize(w, h, false);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
@@ -959,13 +969,20 @@ export const FronteiraGame = (() => {
 
   function pause() {
     if (!running || won) return;
+    if (paused) {
+      FronteiraUI.showPause();
+      return;
+    }
     paused = true;
     FronteiraUI.showPause();
+    try { FronteiraAudio.suspend(); } catch (_) { /* ok */ }
+    try { FronteiraInput.releaseAllDirs(); } catch (_) { /* ok */ }
   }
   function resume() {
     paused = false;
     FronteiraUI.hidePause();
     FronteiraInput.releaseAllDirs();
+    try { FronteiraAudio.resume(); } catch (_) { /* ok */ }
     clock.getDelta();
   }
   function stopToMenu() {
