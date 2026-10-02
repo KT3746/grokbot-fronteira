@@ -8,12 +8,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FRONTEIRA</title>
-  <link rel="stylesheet" href="css/style.css?v=202610012326" />
+  <link rel="stylesheet" href="css/style.css?v=202610020208" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233d2a1f'/%3E%3Crect x='10' y='28' width='44' height='22' fill='%235c3d2e'/%3E%3Cpolygon points='8,28 32,12 56,28' fill='%23c4a574'/%3E%3C/svg%3E" />
   <script type="importmap">
   {
     "imports": {
-      "three": "./js/vendor/three.module.js?v=202610012326"
+      "three": "./js/vendor/three.module.js?v=202610020208"
     }
   }
   </script>
@@ -21,14 +21,26 @@
 <body>
   <div id="app">
     <div id="juice-fx" class="juice-fx" aria-hidden="true"></div>
+    <div id="quest-toast" class="quest-toast hidden" role="status" aria-live="polite">Tarefa concluída</div>
     <canvas id="game" aria-label="Área do jogo FRONTEIRA"></canvas>
 
     <div id="hud" class="hud hidden" aria-live="polite">
       <div class="hud-left">
         <span id="hud-obj-label">Objetivo</span>
         <span id="hud-objective">Explore o povoado</span>
+        <div id="obj-tracker" class="obj-tracker" aria-label="Progresso do dia">
+          <span class="obj-dot" data-q="entrega" title="Encomenda"></span>
+          <span class="obj-dot" data-q="ferradura" title="Ferradura"></span>
+          <span class="obj-dot" data-q="agua" title="Água"></span>
+          <span id="obj-count" class="obj-count">0/3</span>
+        </div>
       </div>
       <div class="hud-right">
+        <div id="compass" class="compass" aria-label="Bússola" title="Norte">
+          <span class="compass-ring" aria-hidden="true"></span>
+          <span id="compass-needle" class="compass-needle" aria-hidden="true"></span>
+          <span class="compass-n" aria-hidden="true">N</span>
+        </div>
         <button type="button" id="btn-mute" class="icon-btn" aria-label="Mudo">🔊</button>
         <button type="button" id="btn-pause" class="icon-btn" aria-label="Pausar">❚❚</button>
       </div>
@@ -57,6 +69,7 @@
         <h1 class="logo">FRONTEIRA</h1>
         <p class="tagline">Poeira, madeira e gente dura — 3ª pessoa baixo-poli.</p>
         <p class="rule">Ande pela rua · fale · ajude o dia a passar</p>
+        <p id="daily-meta" class="daily-meta">Hoje · ainda sem recordes</p>
         <button type="button" id="btn-play" class="btn primary">Jogar</button>
         <button type="button" id="btn-mute-menu" class="btn ghost">Mudo: off</button>
       </div>
@@ -100,12 +113,13 @@
         <h2>Dia concluído</h2>
         <p class="tagline">O sol baixa no sertão. Você fez o que podia — e a fronteira segue.</p>
         <p id="win-summary" class="rule">Tarefas: 3/3</p>
+        <p id="daily-meta-win" class="daily-meta">Hoje · ainda sem recordes</p>
         <button type="button" id="btn-win-again" class="btn primary">Outro dia</button>
         <button type="button" id="btn-win-menu" class="btn ghost">Menu</button>
       </div>
     </section>
   </div>
 
-  <script type="module" src="js/main.js?v=202610012326"></script>
+  <script type="module" src="js/main.js?v=202610020208"></script>
 </body>
 </html>

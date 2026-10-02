@@ -1,8 +1,8 @@
 /* FRONTEIRA — boot (ES module) */
-import { FronteiraAudio } from './audio.js?v=202610012326';
-import { FronteiraInput } from './input.js?v=202610012326';
-import { FronteiraUI } from './ui.js?v=202610012326';
-import { FronteiraGame } from './game.js?v=202610012326';
+import { FronteiraAudio } from './audio.js?v=202610020208';
+import { FronteiraInput } from './input.js?v=202610020208';
+import { FronteiraUI } from './ui.js?v=202610020208';
+import { FronteiraGame } from './game.js?v=202610020208';
 
 const canvas = document.getElementById('game');
 FronteiraUI.init();

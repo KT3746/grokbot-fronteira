@@ -1,9 +1,9 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610012326';
-import { FronteiraWorld } from './world.js?v=202610012326';
-import { FronteiraInput } from './input.js?v=202610012326';
-import { FronteiraUI } from './ui.js?v=202610012326';
+import { FronteiraAudio } from './audio.js?v=202610020208';
+import { FronteiraWorld } from './world.js?v=202610020208';
+import { FronteiraInput } from './input.js?v=202610020208';
+import { FronteiraUI } from './ui.js?v=202610020208';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -44,6 +44,16 @@ export const FronteiraGame = (() => {
       },
       questDone: { entrega: false, ferradura: false, agua: false },
     };
+  }
+
+  const QUEST_LABEL = {
+    entrega: 'Encomenda',
+    ferradura: 'Ferradura',
+    agua: 'Água do poço',
+  };
+
+  function syncProgress() {
+    if (state) FronteiraUI.setQuestProgress(state.questDone);
   }
 
   function objectiveText() {
@@ -87,6 +97,8 @@ export const FronteiraGame = (() => {
     state.questDone[id] = true;
     FronteiraAudio.questDone();
     FronteiraUI.setObjective(objectiveText());
+    syncProgress();
+    FronteiraUI.questCompleteFlash(QUEST_LABEL[id] || id);
     checkWin();
   }
 
@@ -132,6 +144,7 @@ export const FronteiraGame = (() => {
     } else lines.push('…');
     FronteiraAudio.interactChime();
     FronteiraUI.juice('flash');
+    FronteiraUI.recordTalk();
     if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
     FronteiraUI.showDialog(npc.name, lines, after);
   }
@@ -277,8 +290,10 @@ export const FronteiraGame = (() => {
       if (prev && z && !discoveredZones[z]) {
         discoveredZones[z] = true;
         FronteiraUI.juice('flash');
+        FronteiraUI.recordZoneDiscover(z);
       } else if (z) {
         discoveredZones[z] = true;
+        FronteiraUI.recordZoneDiscover(z);
       }
     } else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
   }
@@ -992,6 +1007,7 @@ export const FronteiraGame = (() => {
     syncPlayerVisual(dt);
     updateCamera(dt);
     updateZoneEl();
+    if (running) FronteiraUI.setCompass(player.ang);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -1031,6 +1047,8 @@ export const FronteiraGame = (() => {
     FronteiraUI.setHudVisible(true);
     FronteiraUI.setTouchVisible(true);
     FronteiraUI.setObjective(objectiveText());
+    syncProgress();
+    FronteiraUI.setCompass(player.ang);
     FronteiraInput.releaseAllDirs();
     clock.getDelta();
   }
