@@ -1,8 +1,8 @@
 /* FRONTEIRA — boot (ES module) */
-import { FronteiraAudio } from './audio.js?v=202609281311';
-import { FronteiraInput } from './input.js?v=202609281311';
-import { FronteiraUI } from './ui.js?v=202609281311';
-import { FronteiraGame } from './game.js?v=202609281311';
+import { FronteiraAudio } from './audio.js?v=202610012326';
+import { FronteiraInput } from './input.js?v=202610012326';
+import { FronteiraUI } from './ui.js?v=202610012326';
+import { FronteiraGame } from './game.js?v=202610012326';
 
 const canvas = document.getElementById('game');
 FronteiraUI.init();
@@ -13,8 +13,9 @@ const muted = FronteiraAudio.loadMute();
 FronteiraUI.updateMuteLabels(muted);
 FronteiraAudio.setMuted(muted);
 
+const TIP_KEY = 'fronteira_tip';
 let tipSeen = false;
-try { tipSeen = localStorage.getItem('fronteira_tip') === '1'; } catch (_) {}
+try { tipSeen = localStorage.getItem(TIP_KEY) === '1'; } catch (_) {}
 
 function unlockAudio() {
   FronteiraAudio.unlock();
@@ -27,20 +28,80 @@ function toggleMute() {
   FronteiraUI.updateMuteLabels(m);
 }
 
-function beginPlay() {
-  unlockAudio();
-  if (!tipSeen) {
-    FronteiraUI.showTip();
+function markTipSeen() {
+  if (tipSeen) return;
+  tipSeen = true;
+  try { localStorage.setItem(TIP_KEY, '1'); } catch (_) {}
+  FronteiraUI.hideExploreTip();
+}
+
+/** First-minute PT-BR tip: dismiss on first move/interact; once via localStorage. */
+function armExploreTip() {
+  if (tipSeen) {
+    FronteiraUI.hideExploreTip();
     return;
   }
+  FronteiraUI.showExploreTip();
+  const started = performance.now();
+  const MAX_MS = 60_000;
+
+  const onDismiss = () => {
+    markTipSeen();
+    cleanup();
+  };
+
+  const tick = () => {
+    if (tipSeen) return;
+    if (performance.now() - started > MAX_MS) {
+      markTipSeen();
+      cleanup();
+      return;
+    }
+    const m = FronteiraInput.movement();
+    if (Math.hypot(m.x, m.y) > 0.05) {
+      onDismiss();
+      return;
+    }
+    tipRaf = requestAnimationFrame(tick);
+  };
+
+  let tipRaf = requestAnimationFrame(tick);
+  const tipEl = document.getElementById('explore-tip');
+  const onTipTap = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    onDismiss();
+  };
+  if (tipEl) tipEl.addEventListener('pointerdown', onTipTap);
+
+  // Interact (E / button) also dismisses
+  const interactWatch = setInterval(() => {
+    if (tipSeen) { clearInterval(interactWatch); return; }
+    // consumeInteract is owned by game loop — watch movement + tip tap primarily;
+    // game.js also calls notifyInteract for dismiss.
+  }, 500);
+
+  function cleanup() {
+    cancelAnimationFrame(tipRaf);
+    clearInterval(interactWatch);
+    if (tipEl) tipEl.removeEventListener('pointerdown', onTipTap);
+  }
+
+  // Expose dismiss for game interact / move hook
+  FronteiraGame.onFirstInteract = onDismiss;
+}
+
+function beginPlay() {
+  unlockAudio();
+  // Skip blocking how-to; in-game first-minute tip covers explore guidance.
   FronteiraGame.start();
+  armExploreTip();
 }
 
 FronteiraUI.on('btn-play', 'click', beginPlay);
 FronteiraUI.on('btn-tip-ok', 'click', () => {
-  tipSeen = true;
-  try { localStorage.setItem('fronteira_tip', '1'); } catch (_) {}
+  markTipSeen();
   FronteiraGame.start();
+  // tip already seen — no armExploreTip
 });
 FronteiraUI.on('btn-pause', 'click', () => {
   if (FronteiraGame.running) {
@@ -56,12 +117,16 @@ FronteiraUI.on('btn-resume', 'click', () => {
 FronteiraUI.on('btn-restart', 'click', () => {
   FronteiraUI.hidePause();
   FronteiraGame.start();
+  armExploreTip();
 });
 FronteiraUI.on('btn-menu', 'click', () => FronteiraGame.stopToMenu());
 FronteiraUI.on('btn-mute', 'click', toggleMute);
 FronteiraUI.on('btn-mute-menu', 'click', toggleMute);
 FronteiraUI.on('btn-dialog-next', 'click', () => FronteiraUI.advanceDialog());
-FronteiraUI.on('btn-win-again', 'click', () => FronteiraGame.start());
+FronteiraUI.on('btn-win-again', 'click', () => {
+  FronteiraGame.start();
+  armExploreTip();
+});
 FronteiraUI.on('btn-win-menu', 'click', () => FronteiraGame.stopToMenu());
 
 FronteiraUI.showMenu();
