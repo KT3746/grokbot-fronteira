@@ -2,7 +2,7 @@
 
 Poeira, madeira e gente dura na beira do mapa. Explore um povoado de sertão a pé: fale com a gente, entregue encomendas, ache o que se perdeu e deixe o dia passar.
 
-**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610012326
+**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610020208
 
 ## Como jogar
 
@@ -43,6 +43,12 @@ js/audio.js  world.js  input.js  ui.js  game.js  main.js
 ```
 
 Câmera em **terceira pessoa** (chase cam) com **Three.js / WebGL** baixo-poli: rua de asfalto em canyon, prédios com grade de janelas, névoa sépia, sombras duras. Mobile-first (D-pad e botão grandes, safe-area). Respeita `prefers-reduced-motion`.
+
+### Wave 2
+- Meta diária suave (localStorage PT-BR): zonas descobertas + falas
+- Toast/flash de tarefa concluída (safe com `prefers-reduced-motion`)
+- Tracker de objetivos 0/3 + bússola no HUD (clareza mobile)
+- Cache-bust `?v=202610020208`
 
 Jogo **original** — sem personagens ou marcas licenciadas.
 

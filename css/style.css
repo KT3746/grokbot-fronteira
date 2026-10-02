@@ -98,6 +98,78 @@ html, body {
   line-height: 1.25;
   white-space: normal;
 }
+
+/* Wave2 — objective tracker (mobile clarity) */
+.obj-tracker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.obj-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(196, 165, 116, 0.55);
+  background: rgba(20, 12, 8, 0.5);
+  box-sizing: border-box;
+}
+.obj-dot.is-done {
+  background: var(--warm, #e8b86a);
+  border-color: var(--warm, #e8b86a);
+  box-shadow: 0 0 6px rgba(232, 184, 106, 0.55);
+}
+.obj-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ochre);
+  margin-left: 2px;
+}
+
+/* Wave2 — compass */
+.compass {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  background: rgba(40, 26, 18, 0.85);
+  border: 1px solid rgba(196, 165, 116, 0.45);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.compass-ring {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1px dashed rgba(196, 165, 116, 0.35);
+}
+.compass-n {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 700 9px/1 system-ui, sans-serif;
+  color: var(--warm, #e8b86a);
+  letter-spacing: 0.04em;
+}
+.compass-needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  margin: 0;
+  transform: translate(-50%, -50%) rotate(0deg);
+  transform-origin: 50% 50%;
+  background: linear-gradient(to bottom, #e85d4c 50%, #f2e6d4 50%);
+  border-radius: 1px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+}
+
 .hud-right { pointer-events: auto; flex-shrink: 0; }
 
 .icon-btn {
@@ -444,12 +516,75 @@ html, body {
   100% { opacity: 0; transform: scale(1); }
 }
 
+
+/* Wave2 — soft daily meta */
+.daily-meta {
+  margin: 8px 0 4px;
+  font-size: 0.82rem;
+  color: var(--ochre);
+  letter-spacing: 0.02em;
+  opacity: 0.95;
+}
+
+/* Wave2 — quest complete toast */
+.quest-toast {
+  position: absolute;
+  left: 50%;
+  top: calc(22% + var(--safe-t, 0px));
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  pointer-events: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(30, 18, 12, 0.88);
+  border: 1px solid rgba(232, 184, 106, 0.55);
+  color: var(--cream);
+  font: 700 0.95rem/1.2 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  opacity: 0;
+}
+.quest-toast.hidden { display: none; }
+.quest-toast.is-show {
+  display: block;
+  animation: quest-toast-in 0.5s ease-out forwards;
+}
+.quest-toast.is-show.is-static {
+  animation: none;
+  opacity: 1;
+}
+@keyframes quest-toast-in {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(0.96); }
+  35% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.juice-fx.is-quest {
+  animation: juice-quest 0.65s ease-out;
+}
+@keyframes juice-quest {
+  0% { opacity: 0; background: radial-gradient(circle at 50% 35%, rgba(232,184,106,0.65), transparent 50%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .btn, .pad, .interact-btn, .icon-btn, .juice-fx, .explore-tip { transition: none !important; animation: none !important; }
+  .btn, .pad, .interact-btn, .icon-btn, .juice-fx, .explore-tip, .quest-toast, .compass-needle { transition: none !important; animation: none !important; }
   .btn:active, .pad:active, .pad.is-down, .interact-btn:active, .interact-btn.is-down, .icon-btn:active {
     transform: none !important;
   }
   .overlay { backdrop-filter: none; }
   .hud-left, .pad, .interact-btn { backdrop-filter: none; }
-  .juice-fx.is-flash, .juice-fx.is-pop { animation: none !important; opacity: 0 !important; }
+  .juice-fx.is-flash, .juice-fx.is-pop, .juice-fx.is-quest { animation: none !important; opacity: 0 !important; }
+  .quest-toast.is-show { animation: none !important; opacity: 1 !important; }
+}
+
+
+@media (max-width: 640px) {
+  .hud-left { max-width: min(78vw, 300px); padding: 8px 12px; }
+  #hud-objective { font-size: 0.92rem; }
+  .obj-dot { width: 12px; height: 12px; }
+  .obj-count { font-size: 0.78rem; }
+  .quest-toast { font-size: 0.88rem; padding: 10px 14px; max-width: 90vw; text-align: center; }
 }
