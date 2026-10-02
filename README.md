@@ -2,7 +2,7 @@
 
 Poeira, madeira e gente dura na beira do mapa. Explore um povoado de sertão a pé: fale com a gente, entregue encomendas, ache o que se perdeu e deixe o dia passar.
 
-**Jogar:** https://kt3746.github.io/grokbot-fronteira/
+**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610012326
 
 ## Como jogar
 

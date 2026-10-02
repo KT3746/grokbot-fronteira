@@ -1,9 +1,9 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202609281311';
-import { FronteiraWorld } from './world.js?v=202609281311';
-import { FronteiraInput } from './input.js?v=202609281311';
-import { FronteiraUI } from './ui.js?v=202609281311';
+import { FronteiraAudio } from './audio.js?v=202610012326';
+import { FronteiraWorld } from './world.js?v=202610012326';
+import { FronteiraInput } from './input.js?v=202610012326';
+import { FronteiraUI } from './ui.js?v=202610012326';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -23,6 +23,9 @@ export const FronteiraGame = (() => {
   let state = null, near = null;
   let zoneName = '', zoneFade = 0;
   let reducedMotion = false;
+  let onFirstInteract = null;
+  let highlightRing = null;
+  let discoveredZones = Object.create(null);
   let shadowsOn = true;
   let isLowEnd = false;
   let player = { x: 0, z: 0, ang: 0, moving: false };
@@ -128,6 +131,8 @@ export const FronteiraGame = (() => {
       else lines.push('O poço fica no meio da praça, na rua. Enche o balde aí.');
     } else lines.push('…');
     FronteiraAudio.interactChime();
+    FronteiraUI.juice('flash');
+    if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
     FronteiraUI.showDialog(npc.name, lines, after);
   }
 
@@ -141,6 +146,8 @@ export const FronteiraGame = (() => {
     if (spot.kind === 'well') {
       if (f.talkedRita && !f.hasWater && !f.deliveredWater) {
         FronteiraAudio.interactChime();
+        FronteiraUI.juice('pop');
+        if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
         FronteiraUI.showDialog('Poço', ['Você enche o balde. A água vem fria, cheirando a barro bom.'],
           () => { f.hasWater = true; FronteiraUI.setObjective(objectiveText()); });
       } else if (f.hasWater) {
@@ -163,6 +170,8 @@ export const FronteiraGame = (() => {
       spot.collected = true; f.hasHorseshoe = true;
       if (markerRoots.ferradura) markerRoots.ferradura.visible = false;
       FronteiraAudio.interactChime();
+      FronteiraUI.juice('pop');
+      if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
       FronteiraUI.showDialog('Ferradura', ['Você achou a ferradura perdida do Tião.'],
         () => FronteiraUI.setObjective(objectiveText()));
     }
@@ -170,6 +179,7 @@ export const FronteiraGame = (() => {
 
   function tryInteract() {
     if (!near) return;
+    if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
     if (near.type === 'npc') talkNpc(near.ref);
     else if (near.type === 'spot') useSpot(near.ref);
   }
@@ -209,12 +219,68 @@ export const FronteiraGame = (() => {
     }
     FronteiraUI.setHint(hint, !!near);
     FronteiraUI.setInteractReady(!!near);
+    updateLandmarkHighlight();
+  }
+
+  function ensureHighlightRing() {
+    if (highlightRing || !scene) return;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(1.1, 1.55, 28),
+      new THREE.MeshBasicMaterial({
+        color: 0xe8b86a,
+        transparent: true,
+        opacity: 0.72,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.08;
+    ring.visible = false;
+    scene.add(ring);
+    highlightRing = ring;
+  }
+
+  function updateLandmarkHighlight() {
+    ensureHighlightRing();
+    if (!highlightRing) return;
+    if (!near) {
+      highlightRing.visible = false;
+      return;
+    }
+    let x, z;
+    if (near.type === 'npc') {
+      x = near.ref.x; z = near.ref.z;
+    } else {
+      x = near.ref.x + (near.ref.w || 0) * 0.5;
+      z = near.ref.z + (near.ref.d || 0) * 0.5;
+    }
+    highlightRing.position.x = x;
+    highlightRing.position.z = z;
+    highlightRing.visible = true;
+    if (!reducedMotion) {
+      const pulse = 0.85 + 0.15 * Math.sin(performance.now() * 0.006);
+      highlightRing.scale.set(pulse, pulse, pulse);
+      highlightRing.material.opacity = 0.55 + 0.25 * Math.sin(performance.now() * 0.006);
+    } else {
+      highlightRing.scale.set(1, 1, 1);
+      highlightRing.material.opacity = 0.7;
+    }
   }
 
   function updateZone(dt) {
     const z = FronteiraWorld.zoneAt(player.x, player.z);
-    if (z !== zoneName) { zoneName = z; zoneFade = 1.6; }
-    else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
+    if (z !== zoneName) {
+      const prev = zoneName;
+      zoneName = z; zoneFade = 1.6;
+      // Juice on discover POI/zone (skip cold start when prev empty)
+      if (prev && z && !discoveredZones[z]) {
+        discoveredZones[z] = true;
+        FronteiraUI.juice('flash');
+      } else if (z) {
+        discoveredZones[z] = true;
+      }
+    } else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
   }
 
   /* ——— textures ——— */
@@ -950,6 +1016,8 @@ export const FronteiraGame = (() => {
     state = freshState();
     won = false; near = null;
     zoneName = ''; zoneFade = 0;
+    discoveredZones = Object.create(null);
+    if (highlightRing) highlightRing.visible = false;
     camPos.set(player.x, CAM_HEIGHT, player.z - CAM_DIST);
     lookPos.set(player.x, 1.55, player.z + LOOK_AHEAD);
     camera.position.copy(camPos);
@@ -974,6 +1042,7 @@ export const FronteiraGame = (() => {
       return;
     }
     paused = true;
+    FronteiraUI.setObjective(objectiveText());
     FronteiraUI.showPause();
     try { FronteiraAudio.suspend(); } catch (_) { /* ok */ }
     try { FronteiraInput.releaseAllDirs(); } catch (_) { /* ok */ }
@@ -1026,5 +1095,10 @@ export const FronteiraGame = (() => {
     requestAnimationFrame(frame);
   }
 
-  return { init, start, pause, resume, stopToMenu, tryInteract, get running() { return running; } };
+  return {
+    init, start, pause, resume, stopToMenu, tryInteract,
+    get running() { return running; },
+    set onFirstInteract(fn) { onFirstInteract = fn; },
+    get onFirstInteract() { return onFirstInteract; },
+  };
 })();

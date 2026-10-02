@@ -8,18 +8,19 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FRONTEIRA</title>
-  <link rel="stylesheet" href="css/style.css?v=202609281311" />
+  <link rel="stylesheet" href="css/style.css?v=202610012326" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233d2a1f'/%3E%3Crect x='10' y='28' width='44' height='22' fill='%235c3d2e'/%3E%3Cpolygon points='8,28 32,12 56,28' fill='%23c4a574'/%3E%3C/svg%3E" />
   <script type="importmap">
   {
     "imports": {
-      "three": "./js/vendor/three.module.js?v=202609281311"
+      "three": "./js/vendor/three.module.js?v=202610012326"
     }
   }
   </script>
 </head>
 <body>
   <div id="app">
+    <div id="juice-fx" class="juice-fx" aria-hidden="true"></div>
     <canvas id="game" aria-label="Área do jogo FRONTEIRA"></canvas>
 
     <div id="hud" class="hud hidden" aria-live="polite">
@@ -34,6 +35,10 @@
     </div>
 
     <div id="hint-bar" class="hint-bar hidden">Aproxime-se e toque Interagir</div>
+
+    <div id="explore-tip" class="explore-tip hidden" role="status" aria-live="polite">
+      <p><strong>Ande</strong> e explore a cidade — D-pad ou WASD. Toque para dispensar.</p>
+    </div>
 
     <div id="touch" class="touch hidden" aria-hidden="true">
       <div class="dpad" role="group" aria-label="Movimento">
@@ -61,7 +66,7 @@
       <div class="panel tip-panel">
         <h2>Como jogar</h2>
         <ul class="tips">
-          <li><strong>Ande</strong> em 3ª pessoa pela rua principal (D-pad / WASD).</li>
+          <li><strong>Ande</strong> e explore a cidade em 3ª pessoa (D-pad / WASD).</li>
           <li><strong>Interagir</strong> (botão / E / Espaço) fala com gente e objetos.</li>
           <li>Complete as <span class="c-warm">tarefas do dia</span> no HUD.</li>
           <li>Armazém, cantina, poço, estábulo e capela ficam ao longo da rua.</li>
@@ -72,8 +77,10 @@
     </section>
 
     <section id="screen-pause" class="overlay screen hidden" aria-label="Pausa">
-      <div class="panel">
+      <div class="panel pause-panel">
         <h2>Pausado</h2>
+        <p class="pause-obj-label">Objetivo atual</p>
+        <p id="pause-objective" class="pause-objective">Explore o povoado</p>
         <button type="button" id="btn-resume" class="btn primary">Continuar</button>
         <button type="button" id="btn-restart" class="btn">Reiniciar dia</button>
         <button type="button" id="btn-menu" class="btn ghost">Menu</button>
@@ -99,6 +106,6 @@
     </section>
   </div>
 
-  <script type="module" src="js/main.js?v=202609281311"></script>
+  <script type="module" src="js/main.js?v=202610012326"></script>
 </body>
 </html>

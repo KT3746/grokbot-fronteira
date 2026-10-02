@@ -15,8 +15,8 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --pad: 60px;
-  --act: 104px;
+  --pad: 68px;
+  --act: 108px;
 }
 
 html, body {
@@ -228,7 +228,7 @@ html, body {
 
 /* Portrait estreito (~390px): HUD compacto, alvos ≥44px */
 @media (max-width: 420px), (orientation: portrait) and (max-width: 430px) {
-  :root { --pad: 56px; --act: 96px; }
+  :root { --pad: 62px; --act: 100px; }
   .hud { font-size: 0.82rem; padding-top: calc(8px + var(--safe-t)); }
   .hud-left { padding: 5px 10px; max-width: min(72vw, 260px); }
   .icon-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
@@ -237,7 +237,7 @@ html, body {
 }
 
 @media (max-height: 700px) and (max-width: 500px) {
-  :root { --pad: 52px; --act: 88px; }
+  :root { --pad: 58px; --act: 94px; }
   .dpad { bottom: calc(10px + var(--safe-b)); gap: 4px; }
   .interact-btn { bottom: calc(14px + var(--safe-b)); font-size: 0.72rem; }
   .pad, .interact-btn { min-width: 44px; min-height: 44px; }
@@ -245,7 +245,7 @@ html, body {
 
 /* Paisagem baixa (~390px de altura) */
 @media (orientation: landscape) and (max-height: 430px) {
-  :root { --pad: 44px; --act: 72px; }
+  :root { --pad: 52px; --act: 80px; }
   .hud {
     font-size: 0.8rem;
     padding: calc(4px + var(--safe-t)) 8px 4px;
@@ -379,11 +379,77 @@ html, body {
   min-height: 3.2em;
 }
 
+
+/* First-minute explore tip (non-blocking) */
+.explore-tip {
+  position: absolute;
+  left: 50%;
+  top: calc(72px + var(--safe-t));
+  transform: translateX(-50%);
+  z-index: 7;
+  max-width: min(92vw, 360px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(30, 18, 12, 0.88);
+  border: 1.5px solid rgba(196, 165, 116, 0.55);
+  color: var(--cream);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+  cursor: pointer;
+}
+.explore-tip strong { color: var(--warm); }
+.explore-tip.hidden { display: none; }
+
+/* Pause shows current objective */
+.pause-obj-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ochre);
+  margin: 4px 0 2px;
+}
+.pause-objective {
+  font-size: 0.98rem;
+  color: var(--cream);
+  margin: 0 0 16px;
+  line-height: 1.35;
+  min-height: 1.35em;
+}
+
+/* Juice flash / pop (gated in JS via prefers-reduced-motion) */
+.juice-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+}
+.juice-fx.is-flash {
+  animation: juice-flash 0.45s ease-out;
+}
+.juice-fx.is-pop {
+  animation: juice-pop 0.55s ease-out;
+}
+@keyframes juice-flash {
+  0% { opacity: 0; background: radial-gradient(circle at 50% 45%, rgba(232,184,106,0.55), transparent 55%); }
+  35% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes juice-pop {
+  0% { opacity: 0; background: radial-gradient(circle at 50% 40%, rgba(242,230,212,0.5), transparent 45%); transform: scale(0.96); }
+  40% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .btn, .pad, .interact-btn, .icon-btn { transition: none !important; animation: none !important; }
+  .btn, .pad, .interact-btn, .icon-btn, .juice-fx, .explore-tip { transition: none !important; animation: none !important; }
   .btn:active, .pad:active, .pad.is-down, .interact-btn:active, .interact-btn.is-down, .icon-btn:active {
     transform: none !important;
   }
   .overlay { backdrop-filter: none; }
   .hud-left, .pad, .interact-btn { backdrop-filter: none; }
+  .juice-fx.is-flash, .juice-fx.is-pop { animation: none !important; opacity: 0 !important; }
 }
