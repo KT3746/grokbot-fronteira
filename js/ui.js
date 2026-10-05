@@ -1,4 +1,4 @@
-/* FRONTEIRA — overlays, HUD, diálogos + wave2 meta/tracker/toast */
+/* FRONTEIRA — overlays, HUD, diálogos + wave2/3 meta/tracker/toast/inv */
 export const FronteiraUI = (() => {
   const els = {};
   const META_KEY = 'fronteira-daily-meta-v1';
@@ -7,7 +7,8 @@ export const FronteiraUI = (() => {
   function init() {
     [
       'hud', 'hud-objective', 'hint-bar', 'touch', 'explore-tip', 'juice-fx',
-      'quest-toast', 'obj-tracker', 'obj-count', 'compass', 'compass-needle',
+      'quest-toast', 'obj-tracker', 'obj-count', 'compass', 'compass-needle', 'compass-quest',
+      'zone-chip', 'inv-strip',
       'daily-meta', 'daily-meta-win',
       'screen-menu', 'screen-tip', 'screen-pause', 'screen-dialog', 'screen-win',
       'dialog-name', 'dialog-text', 'btn-dialog-next', 'pause-objective',
@@ -125,6 +126,53 @@ export const FronteiraUI = (() => {
     if (b) b.classList.toggle('can-use', !!on);
   }
 
+  /** Wave3 — chip de local persistente no HUD. */
+  function setZone(name) {
+    const el = els['zone-chip'];
+    if (el) el.textContent = name || 'Rua Principal';
+  }
+
+  /** Wave3 — inventário: itens carregados (encomenda / ferradura / balde). */
+  function setInventory(flags) {
+    const f = flags || {};
+    const map = {
+      package: !!(f.hasPackage && !f.deliveredPackage),
+      horseshoe: !!(f.hasHorseshoe && !f.returnedShoe),
+      water: !!(f.hasWater && !f.deliveredWater),
+    };
+    Object.keys(map).forEach((key) => {
+      const slot = document.querySelector(`.inv-slot[data-item="${key}"]`);
+      if (slot) slot.classList.toggle('is-on', map[key]);
+    });
+  }
+
+  /**
+   * Wave3 — seta dourada na bússola aponta ao objetivo.
+   * relativeDeg: ângulo em graus (0 = frente do personagem).
+   */
+  function setQuestArrow(relativeDeg, visible, near) {
+    const arrow = els['compass-quest'];
+    if (!arrow) return;
+    if (!visible) {
+      arrow.classList.add('hidden');
+      arrow.classList.remove('is-near');
+      return;
+    }
+    arrow.classList.remove('hidden');
+    arrow.classList.toggle('is-near', !!near);
+    const deg = relativeDeg || 0;
+    arrow.style.transform = `translate(-50%, -50%) rotate(${deg}deg) translateY(-15px)`;
+  }
+
+  /** Wave3 — vibração curta (Android / Web Vibration). */
+  function haptic(pattern) {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(pattern == null ? 18 : pattern);
+      }
+    } catch (_) { /* ok */ }
+  }
+
   /** Progresso 0–3 no HUD (clareza mobile). */
   function setQuestProgress(doneMap) {
     const ids = ['entrega', 'ferradura', 'agua'];
@@ -153,6 +201,9 @@ export const FronteiraUI = (() => {
     setHudVisible(false);
     setTouchVisible(false);
     setHint('', false);
+    setQuestArrow(0, false);
+    setInventory({});
+    setZone('Rua Principal');
     refreshDailyMeta();
   }
   function showTip() {
@@ -258,6 +309,7 @@ export const FronteiraUI = (() => {
       }, reduced ? 1600 : 2200);
     }
     if (!reduced) juice('quest');
+    haptic([28, 40, 28]);
   }
 
   function on(id, ev, fn) {
@@ -269,7 +321,7 @@ export const FronteiraUI = (() => {
     init, show, hide, setHudVisible, setTouchVisible, setObjective, setHint,
     setInteractReady, showMenu, showTip, hideOverlays, showPause, hidePause,
     showExploreTip, hideExploreTip, juice, questCompleteFlash,
-    setQuestProgress, setCompass,
+    setQuestProgress, setCompass, setQuestArrow, setZone, setInventory, haptic,
     recordZoneDiscover, recordTalk, refreshDailyMeta,
     showDialog, advanceDialog, showWin, updateMuteLabels, on, get els() { return els; },
   };

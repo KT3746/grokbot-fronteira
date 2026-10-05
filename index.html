@@ -8,12 +8,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FRONTEIRA</title>
-  <link rel="stylesheet" href="css/style.css?v=202610020208" />
+  <link rel="stylesheet" href="css/style.css?v=202610052110" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233d2a1f'/%3E%3Crect x='10' y='28' width='44' height='22' fill='%235c3d2e'/%3E%3Cpolygon points='8,28 32,12 56,28' fill='%23c4a574'/%3E%3C/svg%3E" />
   <script type="importmap">
   {
     "imports": {
-      "three": "./js/vendor/three.module.js?v=202610020208"
+      "three": "./js/vendor/three.module.js?v=202610052110"
     }
   }
   </script>
@@ -34,11 +34,18 @@
           <span class="obj-dot" data-q="agua" title="Água"></span>
           <span id="obj-count" class="obj-count">0/3</span>
         </div>
+        <div id="zone-chip" class="zone-chip" aria-label="Local">Rua Principal</div>
+        <div id="inv-strip" class="inv-strip" aria-label="Itens carregados">
+          <span class="inv-slot" data-item="package" title="Encomenda">Embrulho</span>
+          <span class="inv-slot" data-item="horseshoe" title="Ferradura">Ferradura</span>
+          <span class="inv-slot" data-item="water" title="Água">Balde</span>
+        </div>
       </div>
       <div class="hud-right">
-        <div id="compass" class="compass" aria-label="Bússola" title="Norte">
+        <div id="compass" class="compass" aria-label="Bússola" title="Norte e objetivo">
           <span class="compass-ring" aria-hidden="true"></span>
           <span id="compass-needle" class="compass-needle" aria-hidden="true"></span>
+          <span id="compass-quest" class="compass-quest hidden" aria-hidden="true"></span>
           <span class="compass-n" aria-hidden="true">N</span>
         </div>
         <button type="button" id="btn-mute" class="icon-btn" aria-label="Mudo">🔊</button>
@@ -104,6 +111,7 @@
       <div class="panel dialog-panel">
         <p id="dialog-name" class="dialog-name">—</p>
         <p id="dialog-text" class="dialog-text">…</p>
+        <span class="dialog-hint">Toque para continuar</span>
         <button type="button" id="btn-dialog-next" class="btn primary">Continuar</button>
       </div>
     </section>
@@ -120,6 +128,6 @@
     </section>
   </div>
 
-  <script type="module" src="js/main.js?v=202610020208"></script>
+  <script type="module" src="js/main.js?v=202610052110"></script>
 </body>
 </html>

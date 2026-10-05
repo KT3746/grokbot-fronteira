@@ -1,9 +1,9 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610020208';
-import { FronteiraWorld } from './world.js?v=202610020208';
-import { FronteiraInput } from './input.js?v=202610020208';
-import { FronteiraUI } from './ui.js?v=202610020208';
+import { FronteiraAudio } from './audio.js?v=202610052110';
+import { FronteiraWorld } from './world.js?v=202610052110';
+import { FronteiraInput } from './input.js?v=202610052110';
+import { FronteiraUI } from './ui.js?v=202610052110';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -26,6 +26,8 @@ export const FronteiraGame = (() => {
   let onFirstInteract = null;
   let highlightRing = null;
   let discoveredZones = Object.create(null);
+  let nearWas = false;
+  let hapticNearAt = 0;
   let shadowsOn = true;
   let isLowEnd = false;
   let player = { x: 0, z: 0, ang: 0, moving: false };
@@ -54,6 +56,57 @@ export const FronteiraGame = (() => {
 
   function syncProgress() {
     if (state) FronteiraUI.setQuestProgress(state.questDone);
+  }
+
+  function syncInventory() {
+    if (state) FronteiraUI.setInventory(state.flags);
+  }
+
+  /** Posição-mundo do próximo objetivo (NPC / spot). */
+  function questTargetPos() {
+    if (!state) return null;
+    const f = state.flags, qd = state.questDone;
+    const npc = (id) => {
+      const n = FronteiraWorld.npcs.find((x) => x.id === id);
+      return n ? { x: n.x, z: n.z } : null;
+    };
+    const spot = (id) => {
+      const s = FronteiraWorld.interactables.find((x) => x.id === id);
+      if (!s || (s.kind === 'item' && s.collected)) return null;
+      return { x: s.x + (s.w || 0) * 0.5, z: s.z + (s.d || 0) * 0.5 };
+    };
+    if (!qd.entrega) {
+      if (!f.talkedZe) return npc('seu_ze');
+      if (f.hasPackage && !f.deliveredPackage) return npc('dona_clara');
+    }
+    if (!qd.ferradura) {
+      if (!f.talkedTiao) return npc('tiao');
+      if (f.talkedTiao && !f.hasHorseshoe) return spot('ferradura');
+      if (f.hasHorseshoe && !f.returnedShoe) return npc('tiao');
+    }
+    if (!qd.agua) {
+      if (!f.talkedRita) return npc('rita');
+      if (f.talkedRita && !f.hasWater) return spot('poco');
+      if (f.hasWater && !f.deliveredWater) return npc('dona_clara');
+    }
+    return null;
+  }
+
+  function updateQuestArrow() {
+    const tgt = questTargetPos();
+    if (!tgt) {
+      FronteiraUI.setQuestArrow(0, false);
+      return;
+    }
+    const dx = tgt.x - player.x;
+    const dz = tgt.z - player.z;
+    const dist = Math.hypot(dx, dz);
+    const bearing = Math.atan2(dx, dz);
+    let rel = bearing - player.ang;
+    while (rel > Math.PI) rel -= Math.PI * 2;
+    while (rel < -Math.PI) rel += Math.PI * 2;
+    const deg = (rel * 180) / Math.PI;
+    FronteiraUI.setQuestArrow(deg, true, dist < 6);
   }
 
   function objectiveText() {
@@ -98,6 +151,7 @@ export const FronteiraGame = (() => {
     FronteiraAudio.questDone();
     FronteiraUI.setObjective(objectiveText());
     syncProgress();
+    syncInventory();
     FronteiraUI.questCompleteFlash(QUEST_LABEL[id] || id);
     checkWin();
   }
@@ -109,7 +163,7 @@ export const FronteiraGame = (() => {
     if (npc.id === 'seu_ze') {
       if (!f.talkedZe) {
         lines.push(...npc.lines.quest_give);
-        after = () => { f.talkedZe = true; f.hasPackage = true; FronteiraUI.setObjective(objectiveText()); };
+        after = () => { f.talkedZe = true; f.hasPackage = true; FronteiraUI.setObjective(objectiveText()); syncInventory(); };
       } else if (f.deliveredPackage) lines.push(...npc.lines.after);
       else if (f.hasPackage) lines.push('Ainda com o embrulho? A cantina fica adiante à direita.');
       else lines.push(...npc.lines.idle);
@@ -126,7 +180,7 @@ export const FronteiraGame = (() => {
     } else if (npc.id === 'tiao') {
       if (!f.talkedTiao) {
         lines.push(...npc.lines.idle);
-        after = () => { f.talkedTiao = true; FronteiraUI.setObjective(objectiveText()); };
+        after = () => { f.talkedTiao = true; FronteiraUI.setObjective(objectiveText()); syncInventory(); };
       } else if (f.hasHorseshoe && !f.returnedShoe) {
         lines.push(...npc.lines.found);
         after = () => { f.hasHorseshoe = false; f.returnedShoe = true; markQuest('ferradura'); };
@@ -137,13 +191,14 @@ export const FronteiraGame = (() => {
     } else if (npc.id === 'rita') {
       if (!f.talkedRita) {
         lines.push(...npc.lines.idle);
-        after = () => { f.talkedRita = true; FronteiraUI.setObjective(objectiveText()); };
+        after = () => { f.talkedRita = true; FronteiraUI.setObjective(objectiveText()); syncInventory(); };
       } else if (f.deliveredWater) { lines.push(...npc.lines.thanks); lines.push(...npc.lines.after); }
       else if (f.hasWater) lines.push(...npc.lines.got_water);
       else lines.push('O poço fica no meio da praça, na rua. Enche o balde aí.');
     } else lines.push('…');
     FronteiraAudio.interactChime();
     FronteiraUI.juice('flash');
+    FronteiraUI.haptic(20);
     FronteiraUI.recordTalk();
     if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
     FronteiraUI.showDialog(npc.name, lines, after);
@@ -160,9 +215,10 @@ export const FronteiraGame = (() => {
       if (f.talkedRita && !f.hasWater && !f.deliveredWater) {
         FronteiraAudio.interactChime();
         FronteiraUI.juice('pop');
+        FronteiraUI.haptic(22);
         if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
         FronteiraUI.showDialog('Poço', ['Você enche o balde. A água vem fria, cheirando a barro bom.'],
-          () => { f.hasWater = true; FronteiraUI.setObjective(objectiveText()); });
+          () => { f.hasWater = true; FronteiraUI.setObjective(objectiveText()); syncInventory(); });
       } else if (f.hasWater) {
         FronteiraUI.showDialog('Poço', ['O balde já está cheio.']); FronteiraAudio.interactChime();
       } else if (f.deliveredWater) {
@@ -184,9 +240,10 @@ export const FronteiraGame = (() => {
       if (markerRoots.ferradura) markerRoots.ferradura.visible = false;
       FronteiraAudio.interactChime();
       FronteiraUI.juice('pop');
+      FronteiraUI.haptic(22);
       if (typeof onFirstInteract === 'function') { const cb = onFirstInteract; onFirstInteract = null; cb(); }
       FronteiraUI.showDialog('Ferradura', ['Você achou a ferradura perdida do Tião.'],
-        () => FronteiraUI.setObjective(objectiveText()));
+        () => { FronteiraUI.setObjective(objectiveText()); syncInventory(); });
     }
   }
 
@@ -232,6 +289,14 @@ export const FronteiraGame = (() => {
     }
     FronteiraUI.setHint(hint, !!near);
     FronteiraUI.setInteractReady(!!near);
+    if (near && !nearWas) {
+      const now = performance.now();
+      if (now - hapticNearAt > 450) {
+        hapticNearAt = now;
+        FronteiraUI.haptic(12);
+      }
+    }
+    nearWas = !!near;
     updateLandmarkHighlight();
   }
 
@@ -286,10 +351,12 @@ export const FronteiraGame = (() => {
     if (z !== zoneName) {
       const prev = zoneName;
       zoneName = z; zoneFade = 1.6;
+      FronteiraUI.setZone(z || 'Rua Principal');
       // Juice on discover POI/zone (skip cold start when prev empty)
       if (prev && z && !discoveredZones[z]) {
         discoveredZones[z] = true;
         FronteiraUI.juice('flash');
+        FronteiraUI.haptic(10);
         FronteiraUI.recordZoneDiscover(z);
       } else if (z) {
         discoveredZones[z] = true;
@@ -1007,7 +1074,10 @@ export const FronteiraGame = (() => {
     syncPlayerVisual(dt);
     updateCamera(dt);
     updateZoneEl();
-    if (running) FronteiraUI.setCompass(player.ang);
+    if (running) {
+      FronteiraUI.setCompass(player.ang);
+      if (!paused && !won) updateQuestArrow();
+    }
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -1033,7 +1103,11 @@ export const FronteiraGame = (() => {
     won = false; near = null;
     zoneName = ''; zoneFade = 0;
     discoveredZones = Object.create(null);
+    nearWas = false;
     if (highlightRing) highlightRing.visible = false;
+    FronteiraUI.setQuestArrow(0, false);
+    FronteiraUI.setZone('Rua Principal');
+    FronteiraUI.setInventory({});
     camPos.set(player.x, CAM_HEIGHT, player.z - CAM_DIST);
     lookPos.set(player.x, 1.55, player.z + LOOK_AHEAD);
     camera.position.copy(camPos);
@@ -1048,7 +1122,10 @@ export const FronteiraGame = (() => {
     FronteiraUI.setTouchVisible(true);
     FronteiraUI.setObjective(objectiveText());
     syncProgress();
+    syncInventory();
+    FronteiraUI.setZone(FronteiraWorld.zoneAt(player.x, player.z) || 'Rua Principal');
     FronteiraUI.setCompass(player.ang);
+    updateQuestArrow();
     FronteiraInput.releaseAllDirs();
     clock.getDelta();
   }
