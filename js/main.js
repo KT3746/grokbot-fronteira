@@ -1,8 +1,8 @@
 /* FRONTEIRA — boot (ES module) */
-import { FronteiraAudio } from './audio.js?v=202610020208';
-import { FronteiraInput } from './input.js?v=202610020208';
-import { FronteiraUI } from './ui.js?v=202610020208';
-import { FronteiraGame } from './game.js?v=202610020208';
+import { FronteiraAudio } from './audio.js?v=202610052110';
+import { FronteiraInput } from './input.js?v=202610052110';
+import { FronteiraUI } from './ui.js?v=202610052110';
+import { FronteiraGame } from './game.js?v=202610052110';
 
 const canvas = document.getElementById('game');
 FronteiraUI.init();
@@ -123,6 +123,19 @@ FronteiraUI.on('btn-menu', 'click', () => FronteiraGame.stopToMenu());
 FronteiraUI.on('btn-mute', 'click', toggleMute);
 FronteiraUI.on('btn-mute-menu', 'click', toggleMute);
 FronteiraUI.on('btn-dialog-next', 'click', () => FronteiraUI.advanceDialog());
+/* Wave3 — toque em qualquer lugar do diálogo avança (mobile). */
+(() => {
+  const dlg = document.getElementById('screen-dialog');
+  if (!dlg) return;
+  dlg.addEventListener('pointerdown', (e) => {
+    if (dlg.classList.contains('hidden')) return;
+    const t = e.target;
+    if (t && t.id === 'btn-dialog-next') return;
+    if (t && t.closest && t.closest('#btn-dialog-next')) return;
+    e.preventDefault();
+    FronteiraUI.advanceDialog();
+  });
+})();
 FronteiraUI.on('btn-win-again', 'click', () => {
   FronteiraGame.start();
   armExploreTip();
