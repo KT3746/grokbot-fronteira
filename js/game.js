@@ -1,9 +1,9 @@
 /* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610052110';
-import { FronteiraWorld } from './world.js?v=202610052110';
-import { FronteiraInput } from './input.js?v=202610052110';
-import { FronteiraUI } from './ui.js?v=202610052110';
+import { FronteiraAudio } from './audio.js?v=202610060540';
+import { FronteiraWorld } from './world.js?v=202610060540';
+import { FronteiraInput } from './input.js?v=202610060540';
+import { FronteiraUI } from './ui.js?v=202610060540';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -36,6 +36,10 @@ export const FronteiraGame = (() => {
   let roadMat, dirtMat, asphaltMat;
   let wagonGroup;
   let woodMatCache = {};
+  /* Wave4 — baliza 3D do objetivo + cronômetro do dia */
+  let beacon = null;
+  let dayTime = 0;
+  let timerShown = -1;
 
   function freshState() {
     return {
@@ -68,12 +72,13 @@ export const FronteiraGame = (() => {
     const f = state.flags, qd = state.questDone;
     const npc = (id) => {
       const n = FronteiraWorld.npcs.find((x) => x.id === id);
-      return n ? { x: n.x, z: n.z } : null;
+      return n ? { x: n.x, z: n.z, label: n.name, npc: true } : null;
     };
     const spot = (id) => {
       const s = FronteiraWorld.interactables.find((x) => x.id === id);
       if (!s || (s.kind === 'item' && s.collected)) return null;
-      return { x: s.x + (s.w || 0) * 0.5, z: s.z + (s.d || 0) * 0.5 };
+      const label = id === 'poco' ? 'Poço' : (id === 'ferradura' ? 'Ferradura' : (s.hint || ''));
+      return { x: s.x + (s.w || 0) * 0.5, z: s.z + (s.d || 0) * 0.5, label, npc: false };
     };
     if (!qd.entrega) {
       if (!f.talkedZe) return npc('seu_ze');
@@ -94,8 +99,10 @@ export const FronteiraGame = (() => {
 
   function updateQuestArrow() {
     const tgt = questTargetPos();
+    updateBeacon(tgt);
     if (!tgt) {
       FronteiraUI.setQuestArrow(0, false);
+      FronteiraUI.setQuestDistance(null);
       return;
     }
     const dx = tgt.x - player.x;
@@ -107,6 +114,54 @@ export const FronteiraGame = (() => {
     while (rel < -Math.PI) rel += Math.PI * 2;
     const deg = (rel * 180) / Math.PI;
     FronteiraUI.setQuestArrow(deg, true, dist < 6);
+    FronteiraUI.setQuestDistance(dist, tgt.label);
+  }
+
+  /** Wave4 — losango dourado flutuante sobre o próximo objetivo (visível de longe). */
+  function ensureBeacon() {
+    if (beacon || !scene) return;
+    const g = new THREE.Group();
+    const gem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.55, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffc860, fog: false })
+    );
+    gem.scale.set(1, 1.45, 1);
+    const halo = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.85, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.28, depthWrite: false, fog: false })
+    );
+    halo.scale.set(1, 1.45, 1);
+    const shaft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 2.2, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: true, opacity: 0.35, depthWrite: false, fog: false })
+    );
+    shaft.position.y = -1.6;
+    g.add(gem, halo, shaft);
+    g.userData.gem = gem;
+    g.userData.halo = halo;
+    g.visible = false;
+    scene.add(g);
+    beacon = g;
+  }
+
+  function updateBeacon(tgt) {
+    ensureBeacon();
+    if (!beacon) return;
+    if (!tgt || !running || won) { beacon.visible = false; return; }
+    const dist = Math.hypot(tgt.x - player.x, tgt.z - player.z);
+    // perto demais: some (o anel de interação assume)
+    beacon.visible = dist > 2.6;
+    const t = performance.now() * 0.001;
+    const baseY = tgt.npc ? 3.55 : 2.4;
+    beacon.position.set(tgt.x, baseY + (reducedMotion ? 0 : Math.sin(t * 2.4) * 0.22), tgt.z);
+    if (!reducedMotion) {
+      beacon.userData.gem.rotation.y = t * 1.8;
+      beacon.userData.halo.rotation.y = -t * 1.2;
+      beacon.userData.halo.material.opacity = 0.18 + 0.14 * (0.5 + 0.5 * Math.sin(t * 4));
+    }
+    // cresce com a distância para continuar legível no celular
+    const sc = Math.min(2.1, 1 + Math.max(0, dist - 10) * 0.025);
+    beacon.scale.set(sc, sc, sc);
   }
 
   function objectiveText() {
@@ -141,7 +196,10 @@ export const FronteiraGame = (() => {
     if (countDone() >= 3) {
       won = true; running = false;
       FronteiraAudio.questDone();
-      FronteiraUI.showWin('Tarefas: 3/3 — o sertão respira.');
+      if (beacon) beacon.visible = false;
+      FronteiraUI.setQuestDistance(null);
+      const rec = FronteiraUI.recordDayTime(dayTime);
+      FronteiraUI.showWin('Tarefas: 3/3 — o sertão respira.', dayTime, rec);
     }
   }
 
@@ -267,11 +325,17 @@ export const FronteiraGame = (() => {
     player.moving = mag > 0.05;
     if (!player.moving) return;
     const s = Math.sin(player.ang), c = Math.cos(player.ang);
-    const wishX = (-m.y) * s + m.x * c;
-    const wishZ = (-m.y) * c - m.x * s;
+    let wishX = (-m.y) * s + m.x * c;
+    let wishZ = (-m.y) * c - m.x * s;
+    let speedK = 1;
+    if (m.analog) {
+      // joystick: direção normalizada, velocidade proporcional (mín. 40%)
+      wishX /= mag; wishZ /= mag;
+      speedK = 0.4 + 0.6 * Math.min(1, mag);
+    }
     const target = Math.atan2(wishX, wishZ);
     player.ang = angLerp(player.ang, target, Math.min(1, TURN * dt));
-    const dist = SPEED * dt;
+    const dist = SPEED * speedK * dt;
     const nx = player.x + wishX * dist;
     const nz = player.z + wishZ * dist;
     const box = (x, z) => ({ x: x - PLAYER_R, z: z - PLAYER_R, w: PLAYER_R * 2, d: PLAYER_R * 2 });
@@ -974,7 +1038,7 @@ export const FronteiraGame = (() => {
     {
       const params = new URLSearchParams(window.location.search);
       const debug = params.get('debug') === '1';
-      if (debug) document.body.classList.add('debug');
+      if (debug) { document.body.classList.add('debug'); window.__fronteira = { player }; }
       let chip = document.getElementById('webgl-chip');
       if (!debug) {
         if (chip) chip.remove();
@@ -1061,6 +1125,7 @@ export const FronteiraGame = (() => {
       if (FronteiraInput.consumePause()) pause();
       else {
         const dialogOpen = !document.getElementById('screen-dialog').classList.contains('hidden');
+        dayTime += dt;
         if (!dialogOpen) {
           move(dt);
           updateNear();
@@ -1075,6 +1140,8 @@ export const FronteiraGame = (() => {
     updateCamera(dt);
     updateZoneEl();
     if (running) {
+      const sec = Math.floor(dayTime);
+      if (sec !== timerShown) { timerShown = sec; FronteiraUI.setDayTimer(dayTime); }
       FronteiraUI.setCompass(player.ang);
       if (!paused && !won) updateQuestArrow();
     }
@@ -1101,6 +1168,9 @@ export const FronteiraGame = (() => {
     if (markerRoots.ferradura) markerRoots.ferradura.visible = true;
     state = freshState();
     won = false; near = null;
+    dayTime = 0; timerShown = -1;
+    FronteiraUI.setDayTimer(0);
+    if (beacon) beacon.visible = false;
     zoneName = ''; zoneFade = 0;
     discoveredZones = Object.create(null);
     nearWas = false;
@@ -1151,6 +1221,7 @@ export const FronteiraGame = (() => {
   }
   function stopToMenu() {
     running = false; paused = false; won = false;
+    if (beacon) beacon.visible = false;
     FronteiraUI.showMenu();
   }
 

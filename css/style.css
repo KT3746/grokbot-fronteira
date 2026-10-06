@@ -685,3 +685,96 @@ html, body {
   .obj-count { font-size: 0.78rem; }
   .quest-toast { font-size: 0.88rem; padding: 10px 14px; max-width: 90vw; text-align: center; }
 }
+
+/* ===== Wave 4 — joystick analógico, distância ao objetivo, cronômetro ===== */
+.joy-zone {
+  position: absolute;
+  left: 0;
+  top: 24%;
+  bottom: 0;
+  width: 62%;
+  pointer-events: auto;
+  touch-action: none;
+}
+.joy-base {
+  position: absolute;
+  width: 112px;
+  height: 112px;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(45, 28, 18, 0.15) 30%, rgba(45, 28, 18, 0.42) 100%);
+  border: 2px solid rgba(232, 201, 144, 0.55);
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.45), inset 0 0 14px rgba(196, 165, 116, 0.2);
+  pointer-events: none;
+}
+.joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f0d9b0, #c4a574 70%);
+  border: 2px solid rgba(242, 230, 212, 0.85);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 14px rgba(232, 184, 106, 0.45);
+}
+.obj-dist, .day-timer {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.obj-dist {
+  color: #2a1c14;
+  background: linear-gradient(160deg, #ffd27a, #e8b86a);
+  border: 1px solid rgba(242, 230, 212, 0.6);
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.obj-dist.is-near {
+  background: linear-gradient(160deg, #fff0c8, #f0d9b0);
+  box-shadow: 0 0 10px rgba(255, 210, 122, 0.7);
+}
+.day-timer {
+  color: var(--cream);
+  background: rgba(20, 12, 8, 0.55);
+  border: 1px solid rgba(196, 165, 116, 0.35);
+}
+.obj-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-width: 0;
+}
+.obj-meta .obj-dist, .obj-meta .day-timer { margin-left: 0; }
+.obj-meta .obj-dist { flex: 0 1 auto; min-width: 0; }
+.win-time {
+  margin: 4px 0 6px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.win-time.is-record {
+  color: #ffd27a;
+  text-shadow: 0 0 10px rgba(255, 200, 96, 0.6);
+  animation: win-record 1.2s ease-in-out infinite;
+}
+@keyframes win-record {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@media (max-width: 640px) {
+  .obj-dist, .day-timer { font-size: 0.74rem; padding: 3px 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win-time.is-record { animation: none !important; }
+}
