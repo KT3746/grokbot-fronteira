@@ -3,12 +3,24 @@ export const FronteiraUI = (() => {
   const els = {};
   const META_KEY = 'fronteira-daily-meta-v1';
   const ZONE_TOTAL = 6;
+  const BEST_KEY = 'fronteira-best-day-v1';
+
+  function fmtTime(sec) {
+    const s = Math.max(0, Math.floor(sec || 0));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+  function loadBest() {
+    try {
+      const v = parseFloat(localStorage.getItem(BEST_KEY));
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch (_) { return 0; }
+  }
 
   function init() {
     [
       'hud', 'hud-objective', 'hint-bar', 'touch', 'explore-tip', 'juice-fx',
       'quest-toast', 'obj-tracker', 'obj-count', 'compass', 'compass-needle', 'compass-quest',
-      'zone-chip', 'inv-strip',
+      'zone-chip', 'inv-strip', 'obj-dist', 'day-timer', 'win-time',
       'daily-meta', 'daily-meta-win',
       'screen-menu', 'screen-tip', 'screen-pause', 'screen-dialog', 'screen-win',
       'dialog-name', 'dialog-text', 'btn-dialog-next', 'pause-objective',
@@ -57,10 +69,40 @@ export const FronteiraUI = (() => {
   }
 
   function formatDailyMeta(meta) {
+    const best = loadBest();
+    const bestTxt = best ? ` · melhor dia ${fmtTime(best)}` : '';
     if (!meta.bestZones && !meta.talks) {
-      return 'Hoje · ainda sem recordes';
+      return best ? `Melhor dia ${fmtTime(best)}` : 'Hoje · ainda sem recordes';
     }
-    return `Hoje · zonas ${meta.bestZones}/${ZONE_TOTAL} · falas ${meta.talks}`;
+    return `Hoje · zonas ${meta.bestZones}/${ZONE_TOTAL} · falas ${meta.talks}${bestTxt}`;
+  }
+
+  /** Wave4 — cronômetro do dia no HUD. */
+  function setDayTimer(sec) {
+    if (els['day-timer']) els['day-timer'].textContent = '⏱ ' + fmtTime(sec);
+  }
+
+  /** Wave4 — salva melhor tempo; retorna { best, isNew, prev }. */
+  function recordDayTime(raw) {
+    const sec = Math.floor(raw || 0);
+    const prev = Math.floor(loadBest());
+    const isNew = sec > 0 && (!prev || sec < prev);
+    if (isNew) {
+      try { localStorage.setItem(BEST_KEY, String(sec)); } catch (_) { /* ok */ }
+    }
+    return { best: isNew ? sec : prev, isNew, prev };
+  }
+
+  /** Wave4 — distância ao objetivo (m) no HUD. */
+  function setQuestDistance(dist, label) {
+    const el = els['obj-dist'];
+    if (!el) return;
+    if (dist == null) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const m = Math.max(0, Math.round(dist));
+    const txt = m <= 2 ? 'aqui' : `${m} m`;
+    el.textContent = label ? `${label} · ${txt}` : txt;
+    el.classList.toggle('is-near', m <= 6);
   }
 
   function refreshDailyMeta() {
@@ -202,6 +244,7 @@ export const FronteiraUI = (() => {
     setTouchVisible(false);
     setHint('', false);
     setQuestArrow(0, false);
+    setQuestDistance(null);
     setInventory({});
     setZone('Rua Principal');
     refreshDailyMeta();
@@ -253,8 +296,16 @@ export const FronteiraUI = (() => {
     return true;
   }
 
-  function showWin(summary) {
+  function showWin(summary, sec, rec) {
     if (els['win-summary']) els['win-summary'].textContent = summary || 'Tarefas: 3/3';
+    const wt = els['win-time'];
+    if (wt) {
+      let txt = `Tempo do dia · ${fmtTime(sec)}`;
+      if (rec && rec.isNew) txt += rec.prev ? ` · NOVO RECORDE (antes ${fmtTime(rec.prev)})` : ' · NOVO RECORDE';
+      else if (rec && rec.best) txt += ` · recorde ${fmtTime(rec.best)}`;
+      wt.textContent = txt;
+      wt.classList.toggle('is-record', !!(rec && rec.isNew));
+    }
     refreshDailyMeta();
     show('screen-win');
     setTouchVisible(false);
@@ -323,6 +374,7 @@ export const FronteiraUI = (() => {
     showExploreTip, hideExploreTip, juice, questCompleteFlash,
     setQuestProgress, setCompass, setQuestArrow, setZone, setInventory, haptic,
     recordZoneDiscover, recordTalk, refreshDailyMeta,
+    setDayTimer, recordDayTime, setQuestDistance,
     showDialog, advanceDialog, showWin, updateMuteLabels, on, get els() { return els; },
   };
 })();

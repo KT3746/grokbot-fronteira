@@ -2,7 +2,7 @@
 
 Poeira, madeira e gente dura na beira do mapa. Explore um povoado de sertão a pé: fale com a gente, entregue encomendas, ache o que se perdeu e deixe o dia passar.
 
-**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610052110
+**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610060540
 
 ## Como jogar
 
@@ -24,7 +24,7 @@ Personagens: Seu Zé, Dona Clara, Tião, Padre Elias, Rita.
 
 | Ação | Teclado | Toque |
 |------|---------|-------|
-| Mover (relativo à câmera) | WASD / setas | D-pad |
+| Mover (relativo à câmera) | WASD / setas | Arrastar na tela (joystick) ou D-pad |
 | Interagir | E / Espaço | Botão Interagir |
 | Pausar | Esc | Botão ❚❚ |
 | Mudo | — | 🔊 |
@@ -54,7 +54,12 @@ Câmera em **terceira pessoa** (chase cam) com **Three.js / WebGL** baixo-poli: 
 - Seta dourada na bússola aponta ao próximo objetivo
 - Chip de local persistente + vibração no Android (interagir / tarefa / zona)
 - Diálogo: toque em qualquer lugar para avançar; botão Interagir pulsa perto
-- Cache-bust `?v=202610052110`
+
+### Wave 4
+- Joystick analógico flutuante: arraste o dedo na metade esquerda (velocidade proporcional), D-pad continua
+- Baliza dourada 3D flutuando sobre o próximo objetivo + chip de distância (ex.: "Seu Zé · 22 m")
+- Cronômetro do dia no HUD + recorde de melhor dia (tela final e menu)
+- Cache-bust `?v=202610060540`
 
 Jogo **original** — sem personagens ou marcas licenciadas.
 

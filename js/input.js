@@ -1,4 +1,4 @@
-/* FRONTEIRA — teclado + D-pad + Interagir */
+/* FRONTEIRA — teclado + D-pad + joystick analógico (wave4) + Interagir */
 export const FronteiraInput = (() => {
   const keys = Object.create(null);
   const touchDirs = { up: false, down: false, left: false, right: false };
@@ -17,6 +17,11 @@ export const FronteiraInput = (() => {
     Space: ' ',
     Escape: 'escape',
   };
+
+  /* Wave4 — joystick flutuante: arraste em qualquer ponto da metade esquerda. */
+  const JOY_R = 52;
+  const joy = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  let joyBase = null, joyKnob = null;
 
   let interactQueued = false;
   let pauseQueued = false;
@@ -84,6 +89,62 @@ export const FronteiraInput = (() => {
     });
   }
 
+  function joyRender() {
+    if (!joyBase || !joyKnob) return;
+    joyKnob.style.transform = `translate(calc(-50% + ${joy.x * JOY_R}px), calc(-50% + ${joy.y * JOY_R}px))`;
+  }
+
+  function joyUpdate(cx, cy) {
+    let dx = cx - joy.ox, dy = cy - joy.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > JOY_R) { dx = (dx / d) * JOY_R; dy = (dy / d) * JOY_R; }
+    let nx = dx / JOY_R, ny = dy / JOY_R;
+    // zona morta pequena
+    if (Math.hypot(nx, ny) < 0.12) { nx = 0; ny = 0; }
+    // zona morta lateral: andar reto sem girar por tremida do dedo
+    if (Math.abs(nx) < 0.2) nx = 0;
+    joy.x = nx; joy.y = ny;
+    joyRender();
+  }
+
+  function joyEnd() {
+    joy.active = false; joy.id = null; joy.x = 0; joy.y = 0;
+    if (joyBase) { joyBase.classList.add('hidden'); joyBase.classList.remove('is-active'); }
+  }
+
+  function bindJoystick() {
+    const zone = document.getElementById('joy-zone');
+    joyBase = document.getElementById('joy-base');
+    joyKnob = document.getElementById('joy-knob');
+    if (!zone || !joyBase) return;
+    zone.addEventListener('pointerdown', (e) => {
+      if (joy.active) return;
+      e.preventDefault();
+      const r = zone.getBoundingClientRect();
+      joy.active = true; joy.id = e.pointerId;
+      joy.ox = e.clientX; joy.oy = e.clientY;
+      joy.x = 0; joy.y = 0;
+      joyBase.style.left = (e.clientX - r.left) + 'px';
+      joyBase.style.top = (e.clientY - r.top) + 'px';
+      joyBase.classList.remove('hidden');
+      joyBase.classList.add('is-active');
+      joyRender();
+      try { zone.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (!joy.active || e.pointerId !== joy.id) return;
+      e.preventDefault();
+      joyUpdate(e.clientX, e.clientY);
+    });
+    const end = (e) => {
+      if (!joy.active || (e && e.pointerId !== joy.id)) return;
+      joyEnd();
+    };
+    zone.addEventListener('pointerup', end);
+    zone.addEventListener('pointercancel', end);
+    zone.addEventListener('lostpointercapture', end);
+  }
+
   function bind() {
     window.addEventListener('keydown', (e) => {
       const k = keyFromEvent(e);
@@ -111,6 +172,7 @@ export const FronteiraInput = (() => {
     document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
 
     document.querySelectorAll('.pad[data-dir]').forEach(bindPad);
+    bindJoystick();
 
     const actBtn = document.getElementById('btn-interact');
     if (actBtn) {
@@ -154,9 +216,11 @@ export const FronteiraInput = (() => {
   function releaseAllDirs() {
     touchDirs.up = touchDirs.down = touchDirs.left = touchDirs.right = false;
     document.querySelectorAll('.pad.is-down').forEach((b) => b.classList.remove('is-down'));
+    joyEnd();
   }
 
   function movement() {
+    if (joy.active && (joy.x || joy.y)) return { x: joy.x, y: joy.y, analog: true };
     let x = 0, y = 0;
     const up = touchDirs.up || keys['w'] || keys['arrowup'] || keys['code:KeyW'] || keys['code:ArrowUp'];
     const down = touchDirs.down || keys['s'] || keys['arrowdown'] || keys['code:KeyS'] || keys['code:ArrowDown'];
