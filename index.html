@@ -4,16 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#3d2a1f" />
-  <meta name="description" content="FRONTEIRA — povoado de sertão em 3ª pessoa baixo-poli" />
+  <meta name="description" content="FRONTEIRA: povoado de sertão em 3ª pessoa baixo-poli" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>FRONTEIRA</title>
-  <link rel="stylesheet" href="css/style.css?v=202610060540" />
+  <link rel="stylesheet" href="css/style.css?v=202610070445" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233d2a1f'/%3E%3Crect x='10' y='28' width='44' height='22' fill='%235c3d2e'/%3E%3Cpolygon points='8,28 32,12 56,28' fill='%23c4a574'/%3E%3C/svg%3E" />
   <script type="importmap">
   {
     "imports": {
-      "three": "./js/vendor/three.module.js?v=202610060540"
+      "three": "./js/vendor/three.module.js?v=202610070445"
     }
   }
   </script>
@@ -36,7 +36,7 @@
         </div>
         <div class="obj-meta">
           <span id="day-timer" class="day-timer" aria-label="Tempo do dia">⏱ 0:00</span>
-          <span id="obj-dist" class="obj-dist hidden" aria-label="Distância ao objetivo">—</span>
+          <span id="obj-dist" class="obj-dist hidden" aria-label="Distância ao objetivo">·</span>
         </div>
         <div id="zone-chip" class="zone-chip" aria-label="Local">Rua Principal</div>
         <div id="inv-strip" class="inv-strip" aria-label="Itens carregados">
@@ -46,6 +46,11 @@
         </div>
       </div>
       <div class="hud-right">
+        <div id="mini-radar" class="mini-radar" aria-label="Radar do objetivo" title="Radar">
+          <span class="radar-ring" aria-hidden="true"></span>
+          <span id="radar-blip" class="radar-blip hidden" aria-hidden="true"></span>
+          <span class="radar-you" aria-hidden="true"></span>
+        </div>
         <div id="compass" class="compass" aria-label="Bússola" title="Norte e objetivo">
           <span class="compass-ring" aria-hidden="true"></span>
           <span id="compass-needle" class="compass-needle" aria-hidden="true"></span>
@@ -60,7 +65,7 @@
     <div id="hint-bar" class="hint-bar hidden">Aproxime-se e toque Interagir</div>
 
     <div id="explore-tip" class="explore-tip hidden" role="status" aria-live="polite">
-      <p><strong>Arraste</strong> o dedo na tela (ou use o D-pad) para andar. A <strong>baliza dourada</strong> marca o próximo objetivo. Toque para dispensar.</p>
+      <p><strong>Arraste</strong> o dedo para andar. Segure <strong>Correr</strong> para acelerar. O <strong>radar</strong> e a baliza guiam o objetivo. Toque para dispensar.</p>
     </div>
 
     <div id="touch" class="touch hidden" aria-hidden="true">
@@ -74,6 +79,7 @@
         <button type="button" class="pad pad-right" data-dir="right" aria-label="Direita">▶</button>
         <button type="button" class="pad pad-down" data-dir="down" aria-label="Baixo">▼</button>
       </div>
+      <button type="button" id="btn-sprint" class="sprint-btn" aria-label="Correr">Correr</button>
       <button type="button" id="btn-interact" class="interact-btn" aria-label="Interagir">Interagir</button>
     </div>
 
@@ -81,7 +87,7 @@
       <div class="panel">
         <p class="eyebrow">sertão · rua · poeira</p>
         <h1 class="logo">FRONTEIRA</h1>
-        <p class="tagline">Poeira, madeira e gente dura — 3ª pessoa baixo-poli.</p>
+        <p class="tagline">Poeira, madeira e gente dura. 3ª pessoa baixo-poli.</p>
         <p class="rule">Ande pela rua · fale · ajude o dia a passar</p>
         <p id="daily-meta" class="daily-meta">Hoje · ainda sem recordes</p>
         <button type="button" id="btn-play" class="btn primary">Jogar</button>
@@ -93,7 +99,7 @@
       <div class="panel tip-panel">
         <h2>Como jogar</h2>
         <ul class="tips">
-          <li><strong>Ande</strong> arrastando o dedo na tela, pelo D-pad ou WASD.</li>
+          <li><strong>Ande</strong> arrastando o dedo, pelo D-pad ou WASD. Segure <strong>Correr</strong> (Shift) para acelerar.</li>
           <li><strong>Interagir</strong> (botão / E / Espaço) fala com gente e objetos.</li>
           <li>Complete as <span class="c-warm">tarefas do dia</span> no HUD.</li>
           <li>Armazém, cantina, poço, estábulo e capela ficam ao longo da rua.</li>
@@ -116,7 +122,7 @@
 
     <section id="screen-dialog" class="overlay screen hidden" aria-label="Diálogo">
       <div class="panel dialog-panel">
-        <p id="dialog-name" class="dialog-name">—</p>
+        <p id="dialog-name" class="dialog-name">·</p>
         <p id="dialog-text" class="dialog-text">…</p>
         <span class="dialog-hint">Toque para continuar</span>
         <button type="button" id="btn-dialog-next" class="btn primary">Continuar</button>
@@ -126,7 +132,7 @@
     <section id="screen-win" class="overlay screen hidden" aria-label="Dia concluído">
       <div class="panel">
         <h2>Dia concluído</h2>
-        <p class="tagline">O sol baixa no sertão. Você fez o que podia — e a fronteira segue.</p>
+        <p class="tagline">O sol baixa no sertão. Você fez o que podia, e a fronteira segue.</p>
         <p id="win-summary" class="rule">Tarefas: 3/3</p>
         <p id="win-time" class="win-time">Tempo do dia · 0:00</p>
         <p id="daily-meta-win" class="daily-meta">Hoje · ainda sem recordes</p>
@@ -136,6 +142,6 @@
     </section>
   </div>
 
-  <script type="module" src="js/main.js?v=202610060540"></script>
+  <script type="module" src="js/main.js?v=202610070445"></script>
 </body>
 </html>

@@ -1,9 +1,9 @@
-/* FRONTEIRA — Three.js 3ª pessoa baixo-poli (canyon street) — visual premium */
+/* FRONTEIRA - Three.js 3ª pessoa baixo-poli (canyon street) - visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610060540';
-import { FronteiraWorld } from './world.js?v=202610060540';
-import { FronteiraInput } from './input.js?v=202610060540';
-import { FronteiraUI } from './ui.js?v=202610060540';
+import { FronteiraAudio } from './audio.js?v=202610070445';
+import { FronteiraWorld } from './world.js?v=202610070445';
+import { FronteiraInput } from './input.js?v=202610070445';
+import { FronteiraUI } from './ui.js?v=202610070445';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -36,10 +36,16 @@ export const FronteiraGame = (() => {
   let roadMat, dirtMat, asphaltMat;
   let wagonGroup;
   let woodMatCache = {};
-  /* Wave4 — baliza 3D do objetivo + cronômetro do dia */
+  /* Wave4 - baliza 3D do objetivo + cronômetro do dia */
   let beacon = null;
   let dayTime = 0;
   let timerShown = -1;
+  /* Wave5 - poeira nos pés + dusk */
+  let dustPool = [];
+  let dustCooldown = 0;
+  let camBob = 0;
+  const DUSK_COLOR = 0x8a6a48;
+  const DAY_COLOR = FOG_COLOR;
 
   function freshState() {
     return {
@@ -103,6 +109,7 @@ export const FronteiraGame = (() => {
     if (!tgt) {
       FronteiraUI.setQuestArrow(0, false);
       FronteiraUI.setQuestDistance(null);
+      FronteiraUI.setRadar(0, 0, false);
       return;
     }
     const dx = tgt.x - player.x;
@@ -115,9 +122,17 @@ export const FronteiraGame = (() => {
     const deg = (rel * 180) / Math.PI;
     FronteiraUI.setQuestArrow(deg, true, dist < 6);
     FronteiraUI.setQuestDistance(dist, tgt.label);
+    // Wave5 radar: projeta alvo no espaço local do jogador
+    const s = Math.sin(player.ang), c = Math.cos(player.ang);
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    const maxR = 40;
+    const scale = Math.min(1, dist / maxR);
+    const inv = dist > 0.001 ? scale / dist : 0;
+    FronteiraUI.setRadar(lx * inv, lz * inv, true, dist < 6);
   }
 
-  /** Wave4 — losango dourado flutuante sobre o próximo objetivo (visível de longe). */
+  /** Wave4 - losango dourado flutuante sobre o próximo objetivo (visível de longe). */
   function ensureBeacon() {
     if (beacon || !scene) return;
     const g = new THREE.Group();
@@ -180,7 +195,7 @@ export const FronteiraGame = (() => {
       if (f.talkedRita && !f.hasWater) return 'Encha o balde no poço';
       if (f.hasWater && !f.deliveredWater) return 'Leve a água à Dona Clara';
     }
-    return 'Dia tranquilo — explore o povoado';
+    return 'Dia tranquilo. Explore o povoado';
   }
 
   function countDone() {
@@ -199,7 +214,7 @@ export const FronteiraGame = (() => {
       if (beacon) beacon.visible = false;
       FronteiraUI.setQuestDistance(null);
       const rec = FronteiraUI.recordDayTime(dayTime);
-      FronteiraUI.showWin('Tarefas: 3/3 — o sertão respira.', dayTime, rec);
+      FronteiraUI.showWin('Tarefas: 3/3. O sertão respira.', dayTime, rec);
     }
   }
 
@@ -335,6 +350,7 @@ export const FronteiraGame = (() => {
     }
     const target = Math.atan2(wishX, wishZ);
     player.ang = angLerp(player.ang, target, Math.min(1, TURN * dt));
+    if (FronteiraInput.isSprinting && FronteiraInput.isSprinting()) speedK *= 1.55;
     const dist = SPEED * speedK * dt;
     const nx = player.x + wishX * dist;
     const nz = player.z + wishZ * dist;
@@ -342,14 +358,16 @@ export const FronteiraGame = (() => {
     if (!FronteiraWorld.collides(box(nx, player.z))) player.x = nx;
     if (!FronteiraWorld.collides(box(player.x, nz))) player.z = nz;
     FronteiraAudio.footstep();
+    dustCooldown -= dt;
+    if (dustCooldown <= 0) { spawnDust(); dustCooldown = FronteiraInput.isSprinting && FronteiraInput.isSprinting() ? 0.08 : 0.14; }
   }
 
   function updateNear() {
     near = FronteiraWorld.nearInteract(player.x, player.z, 2.2);
     let hint = '';
     if (near) {
-      if (near.type === 'npc') hint = near.ref.name + ' — Interagir';
-      else hint = (near.ref.hint || 'Interagir') + ' — Interagir';
+      if (near.type === 'npc') hint = near.ref.name + ' · Interagir';
+      else hint = (near.ref.hint || 'Interagir') + ' · Interagir';
     }
     FronteiraUI.setHint(hint, !!near);
     FronteiraUI.setInteractReady(!!near);
@@ -422,6 +440,8 @@ export const FronteiraGame = (() => {
         FronteiraUI.juice('flash');
         FronteiraUI.haptic(10);
         FronteiraUI.recordZoneDiscover(z);
+        FronteiraUI.flashZoneTitle(z);
+        zoneFade = 0; // CSS toast cuida do fade
       } else if (z) {
         discoveredZones[z] = true;
         FronteiraUI.recordZoneDiscover(z);
@@ -429,7 +449,7 @@ export const FronteiraGame = (() => {
     } else if (zoneFade > 0) zoneFade = Math.max(0, zoneFade - dt);
   }
 
-  /* ——— textures ——— */
+  /* --- textures --- */
   function makeWindowTexture(baseHex, litChance) {
     const c = document.createElement('canvas');
     c.width = 128; c.height = 256;
@@ -828,7 +848,7 @@ export const FronteiraGame = (() => {
     w4.rotation.y = Math.PI * 0.48;
     scene.add(w4);
 
-    // barrels near landmarks / sidewalks (visual only — no collider)
+    // barrels near landmarks / sidewalks (visual only - no collider)
     const barrelSpots = [
       [-9.5, 40], [-10.2, 46], [9.8, 58], [10.5, 66],
       [-9.0, 6], [0.5, 76], [-8.8, 98], [9.2, 100],
@@ -978,7 +998,7 @@ export const FronteiraGame = (() => {
       npcRoots[n.id] = root;
     }
 
-    // Player — orange torso like reference
+    // Player - orange torso like reference
     playerRoot = makePerson({
       torso: 0xd45520, pants: 0x141418, head: 0xc4a07a, hat: 0x1a1410,
     });
@@ -1078,18 +1098,92 @@ export const FronteiraGame = (() => {
     }
   }
 
+
+  /* Wave5 - poeira nos pés ao andar */
+  function spawnDust() {
+    if (!scene || reducedMotion || isLowEnd) return;
+    let p = dustPool.find((d) => !d.active);
+    if (!p) {
+      if (dustPool.length > 18) return;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.55, 0.55),
+        new THREE.MeshBasicMaterial({
+          color: 0xc4a574, transparent: true, opacity: 0.45,
+          depthWrite: false, fog: true,
+        })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.visible = false;
+      scene.add(mesh);
+      p = { mesh, active: false, life: 0 };
+      dustPool.push(p);
+    }
+    p.active = true;
+    p.life = 0.45;
+    const back = 0.35;
+    p.mesh.position.set(
+      player.x - Math.sin(player.ang) * back + (Math.random() - 0.5) * 0.35,
+      0.06,
+      player.z - Math.cos(player.ang) * back + (Math.random() - 0.5) * 0.35
+    );
+    p.mesh.scale.set(0.6, 0.6, 0.6);
+    p.mesh.material.opacity = 0.42;
+    p.mesh.visible = true;
+  }
+
+  function updateDust(dt) {
+    for (const p of dustPool) {
+      if (!p.active) continue;
+      p.life -= dt;
+      if (p.life <= 0) {
+        p.active = false;
+        p.mesh.visible = false;
+        continue;
+      }
+      const k = p.life / 0.45;
+      p.mesh.material.opacity = 0.42 * k;
+      const sc = 0.6 + (1 - k) * 1.1;
+      p.mesh.scale.set(sc, sc, sc);
+      p.mesh.position.y = 0.06 + (1 - k) * 0.25;
+    }
+  }
+
+  /* Wave5 - céu / névoa ao entardecer conforme o cronômetro do dia */
+  function updateDusk() {
+    if (!scene || !scene.fog) return;
+    // ~4 min de jogo = dia cheio; entardece aos poucos
+    const t = Math.min(1, dayTime / 240);
+    const ease = t * t;
+    const col = new THREE.Color(DAY_COLOR).lerp(new THREE.Color(DUSK_COLOR), ease * 0.85);
+    scene.background.copy(col);
+    scene.fog.color.copy(col);
+    if (hemi) {
+      hemi.intensity = 0.55 - ease * 0.18;
+    }
+    if (sun) {
+      sun.intensity = (isLowEnd ? 1.1 : 1.45) - ease * 0.45;
+      sun.color.setHex(ease > 0.5 ? 0xffc080 : 0xffe0b0);
+    }
+  }
+
   function updateCamera(dt) {
     const s = Math.sin(player.ang), c = Math.cos(player.ang);
+    if (running && !paused && !won && player.moving && !reducedMotion) {
+      camBob += dt * (FronteiraInput.isSprinting && FronteiraInput.isSprinting() ? 14 : 9);
+    } else {
+      camBob *= Math.max(0, 1 - dt * 6);
+    }
+    const bobY = reducedMotion ? 0 : Math.sin(camBob) * 0.08;
     const desired = _tmp.set(
       player.x - s * CAM_DIST,
-      CAM_HEIGHT,
+      CAM_HEIGHT + bobY,
       player.z - c * CAM_DIST
     );
     const k = 1 - Math.exp(-(reducedMotion ? 8 : 5.5) * dt);
     camPos.lerp(desired, k);
     lookPos.set(
       player.x + s * LOOK_AHEAD,
-      1.55,
+      1.55 + bobY * 0.4,
       player.z + c * LOOK_AHEAD
     );
     camera.position.copy(camPos);
@@ -1101,16 +1195,18 @@ export const FronteiraGame = (() => {
   let zoneEl = null;
   function ensureZoneEl() {
     if (zoneEl) return;
-    zoneEl = document.createElement('div');
-    zoneEl.id = 'zone-title';
-    zoneEl.style.cssText = 'position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font:800 28px system-ui,sans-serif;color:#f2e6d4;text-shadow:0 0 4px #000,0 2px 0 #000;pointer-events:none;z-index:4;opacity:0;letter-spacing:0.06em;';
-    document.getElementById('app').appendChild(zoneEl);
+    zoneEl = document.getElementById('zone-title');
+    if (!zoneEl) {
+      zoneEl = document.createElement('div');
+      zoneEl.id = 'zone-title';
+      const app = document.getElementById('app');
+      if (app) app.appendChild(zoneEl);
+    }
   }
 
   function updateZoneEl() {
+    /* Wave5: descoberta usa flashZoneTitle; trocas leves não spamam toast. */
     ensureZoneEl();
-    zoneEl.textContent = zoneName || '';
-    zoneEl.style.opacity = String(Math.min(1, zoneFade));
   }
 
   function frame() {
@@ -1182,6 +1278,13 @@ export const FronteiraGame = (() => {
     lookPos.set(player.x, 1.55, player.z + LOOK_AHEAD);
     camera.position.copy(camPos);
     camera.lookAt(lookPos);
+    camBob = 0;
+    for (const d of dustPool) { d.active = false; if (d.mesh) d.mesh.visible = false; }
+    if (scene && scene.fog) {
+      scene.background.setHex(DAY_COLOR);
+      scene.fog.color.setHex(DAY_COLOR);
+    }
+    FronteiraUI.setRadar(0, 0, false);
   }
 
   function start() {

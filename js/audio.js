@@ -1,4 +1,4 @@
-/* FRONTEIRA — Web Audio: vento, passos, chime, mudo */
+/* FRONTEIRA - Web Audio: vento, passos, chime, mudo */
 export const FronteiraAudio = (() => {
   let ctx = null;
   let muted = false;
