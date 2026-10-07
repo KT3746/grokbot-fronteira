@@ -1,4 +1,4 @@
-/* FRONTEIRA — layout canyon (rua principal) + NPCs/quests */
+/* FRONTEIRA - layout canyon (rua principal) + NPCs/quests */
 export const FronteiraWorld = (() => {
   // Units ≈ meters. X = L/R, Z = ao longo da rua (norte+).
   const ROAD_HALF = 7;
@@ -7,13 +7,13 @@ export const FronteiraWorld = (() => {
   // Named landmark footprints (collision AABBs in XZ). y unused for collision.
   // Continuous canyon fillers generated in game.js from streetSegments.
   const solids = [
-    // Capela — fundo da rua (norte)
+    // Capela - fundo da rua (norte)
     { id: 'capela', x: -10, z: 155, w: 20, d: 14, h: 22, style: 'capela', label: 'Capela', color: 0xc8b8a0 },
-    // Armazém — lado esquerdo
+    // Armazém - lado esquerdo
     { id: 'armazem', x: -28, z: 35, w: 16, d: 18, h: 16, style: 'armazem', label: 'Armazém', color: 0x8a6a48 },
-    // Cantina — lado direito
+    // Cantina - lado direito
     { id: 'cantina', x: 12, z: 55, w: 18, d: 16, h: 15, style: 'cantina', label: 'Cantina', color: 0x9a5848 },
-    // Estábulo — sul-oeste, off main
+    // Estábulo - sul-oeste, off main
     { id: 'estabulo', x: -30, z: -5, w: 22, d: 16, h: 12, style: 'estabulo', label: 'Estábulo', color: 0x8a7848 },
     // Casas
     { id: 'casa1', x: 12, z: 95, w: 14, d: 12, h: 13, style: 'casa', label: 'Casa', color: 0xa88860 },
@@ -113,7 +113,7 @@ export const FronteiraWorld = (() => {
       shirt: 0x2a2a30, pants: 0x1a1a20, skin: 0xc8a888, hat: 0x2a2a32,
       place: 'Capela',
       lines: {
-        idle: ['A capela é sombra no sol. Entre em paz.', 'Ajude o próximo — o dia fica mais leve.'],
+        idle: ['A capela é sombra no sol. Entre em paz.', 'Ajude o próximo - o dia fica mais leve.'],
         bless: ['Que o caminho te guarde, viajante.'],
       },
     },

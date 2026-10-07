@@ -1,4 +1,4 @@
-/* FRONTEIRA — teclado + D-pad + joystick analógico (wave4) + Interagir */
+/* FRONTEIRA - teclado + D-pad + joystick (wave4) + Correr (wave5) + Interagir */
 export const FronteiraInput = (() => {
   const keys = Object.create(null);
   const touchDirs = { up: false, down: false, left: false, right: false };
@@ -18,13 +18,16 @@ export const FronteiraInput = (() => {
     Escape: 'escape',
   };
 
-  /* Wave4 — joystick flutuante: arraste em qualquer ponto da metade esquerda. */
+  /* Wave4 - joystick flutuante: arraste em qualquer ponto da metade esquerda. */
   const JOY_R = 52;
   const joy = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
   let joyBase = null, joyKnob = null;
 
   let interactQueued = false;
   let pauseQueued = false;
+  /* Wave5 - hold Correr / Shift */
+  let sprintHeld = false;
+  let dpadEl = null;
 
   function keyFromEvent(e) {
     if (e.code && CODE_TO_KEY[e.code]) return CODE_TO_KEY[e.code];
@@ -89,6 +92,12 @@ export const FronteiraInput = (() => {
     });
   }
 
+
+  function dimDpad(on) {
+    if (!dpadEl) dpadEl = document.querySelector('.dpad');
+    if (dpadEl) dpadEl.classList.toggle('is-dim', !!on);
+  }
+
   function joyRender() {
     if (!joyBase || !joyKnob) return;
     joyKnob.style.transform = `translate(calc(-50% + ${joy.x * JOY_R}px), calc(-50% + ${joy.y * JOY_R}px))`;
@@ -110,6 +119,7 @@ export const FronteiraInput = (() => {
   function joyEnd() {
     joy.active = false; joy.id = null; joy.x = 0; joy.y = 0;
     if (joyBase) { joyBase.classList.add('hidden'); joyBase.classList.remove('is-active'); }
+    dimDpad(false);
   }
 
   function bindJoystick() {
@@ -128,6 +138,7 @@ export const FronteiraInput = (() => {
       joyBase.style.top = (e.clientY - r.top) + 'px';
       joyBase.classList.remove('hidden');
       joyBase.classList.add('is-active');
+      dimDpad(true);
       joyRender();
       try { zone.setPointerCapture(e.pointerId); } catch (_) {}
     });
@@ -143,6 +154,35 @@ export const FronteiraInput = (() => {
     zone.addEventListener('pointerup', end);
     zone.addEventListener('pointercancel', end);
     zone.addEventListener('lostpointercapture', end);
+  }
+
+
+  function bindSprint() {
+    const btn = document.getElementById('btn-sprint');
+    const set = (v, ev) => {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      sprintHeld = !!v;
+      if (btn) btn.classList.toggle('is-down', !!v);
+    };
+    if (btn) {
+      btn.addEventListener('pointerdown', (e) => {
+        set(true, e);
+        try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+      btn.addEventListener('pointerup', (e) => set(false, e));
+      btn.addEventListener('pointercancel', (e) => set(false, e));
+      btn.addEventListener('lostpointercapture', () => set(false));
+      btn.addEventListener('touchstart', (e) => set(true, e), { passive: false });
+      btn.addEventListener('touchend', (e) => set(false, e), { passive: false });
+      btn.addEventListener('touchcancel', () => set(false));
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sprintHeld = true; if (btn) btn.classList.add('is-down'); }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sprintHeld = false; if (btn) btn.classList.remove('is-down'); }
+    });
   }
 
   function bind() {
@@ -173,6 +213,7 @@ export const FronteiraInput = (() => {
 
     document.querySelectorAll('.pad[data-dir]').forEach(bindPad);
     bindJoystick();
+    bindSprint();
 
     const actBtn = document.getElementById('btn-interact');
     if (actBtn) {
@@ -216,6 +257,9 @@ export const FronteiraInput = (() => {
   function releaseAllDirs() {
     touchDirs.up = touchDirs.down = touchDirs.left = touchDirs.right = false;
     document.querySelectorAll('.pad.is-down').forEach((b) => b.classList.remove('is-down'));
+    sprintHeld = false;
+    const sb = document.getElementById('btn-sprint');
+    if (sb) sb.classList.remove('is-down');
     joyEnd();
   }
 
@@ -234,5 +278,6 @@ export const FronteiraInput = (() => {
     return { x, y };
   }
 
-  return { bind, consumeInteract, consumePause, movement, releaseAllDirs };
+  function isSprinting() { return !!sprintHeld; }
+  return { bind, consumeInteract, consumePause, movement, releaseAllDirs, isSprinting };
 })();

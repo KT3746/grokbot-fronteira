@@ -1,4 +1,4 @@
-/* FRONTEIRA — sertão dusty, mobile-first (polish 390×844) */
+/* FRONTEIRA - sertão dusty, mobile-first (polish 390×844) */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -99,7 +99,7 @@ html, body {
   white-space: normal;
 }
 
-/* Wave2 — objective tracker (mobile clarity) */
+/* Wave2 - objective tracker (mobile clarity) */
 .obj-tracker {
   display: flex;
   align-items: center;
@@ -128,7 +128,7 @@ html, body {
   margin-left: 2px;
 }
 
-/* Wave2 — compass */
+/* Wave2 - compass */
 .compass {
   position: relative;
   width: 44px;
@@ -517,7 +517,7 @@ html, body {
 }
 
 
-/* Wave2 — soft daily meta */
+/* Wave2 - soft daily meta */
 .daily-meta {
   margin: 8px 0 4px;
   font-size: 0.82rem;
@@ -526,7 +526,7 @@ html, body {
   opacity: 0.95;
 }
 
-/* Wave2 — quest complete toast */
+/* Wave2 - quest complete toast */
 .quest-toast {
   position: absolute;
   left: 50%;
@@ -570,7 +570,7 @@ html, body {
 }
 
 
-/* ===== Wave 3 — inventário, seta de objetivo, zona, juice ===== */
+/* ===== Wave 3 - inventário, seta de objetivo, zona, juice ===== */
 .zone-chip {
   margin-top: 4px;
   font-size: 0.68rem;
@@ -686,7 +686,7 @@ html, body {
   .quest-toast { font-size: 0.88rem; padding: 10px 14px; max-width: 90vw; text-align: center; }
 }
 
-/* ===== Wave 4 — joystick analógico, distância ao objetivo, cronômetro ===== */
+/* ===== Wave 4 - joystick analógico, distância ao objetivo, cronômetro ===== */
 .joy-zone {
   position: absolute;
   left: 0;
@@ -777,4 +777,151 @@ html, body {
 }
 @media (prefers-reduced-motion: reduce) {
   .win-time.is-record { animation: none !important; }
+}
+
+/* ===== Wave 5 - mini-radar, correr, poeira, zona toast, dusk ===== */
+.mini-radar {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(40, 26, 18, 0.55) 0%, rgba(20, 12, 8, 0.88) 100%);
+  border: 1px solid rgba(196, 165, 116, 0.5);
+  pointer-events: none;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45);
+}
+.radar-ring {
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  border: 1px dashed rgba(196, 165, 116, 0.28);
+}
+.radar-you {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #f2e6d4;
+  box-shadow: 0 0 6px rgba(242, 230, 212, 0.8);
+  z-index: 2;
+}
+.radar-blip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #ffc860;
+  border: 1px solid #fff0c8;
+  box-shadow: 0 0 8px rgba(255, 200, 96, 0.9);
+  z-index: 1;
+  transform: translate(0, 0);
+}
+.radar-blip.hidden { display: none; }
+.radar-blip.is-near {
+  background: #fff0c8;
+  box-shadow: 0 0 12px rgba(255, 240, 200, 1);
+}
+
+.sprint-btn {
+  position: absolute;
+  right: calc(12px + var(--safe-r));
+  bottom: calc(22px + var(--safe-b) + var(--act) + 10px);
+  pointer-events: auto;
+  width: 72px;
+  height: 72px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(196, 165, 116, 0.65);
+  background: radial-gradient(circle at 40% 35%, rgba(90, 60, 36, 0.55), rgba(35, 22, 14, 0.62));
+  color: var(--cream);
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.4), inset 0 0 12px rgba(196, 165, 116, 0.08);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  line-height: 1.1;
+  padding: 6px;
+  text-transform: uppercase;
+}
+.sprint-btn:active, .sprint-btn.is-down {
+  transform: scale(0.94);
+  border-color: #f0d9b0;
+  background: radial-gradient(circle at 40% 35%, rgba(196, 165, 116, 0.55), rgba(70, 45, 28, 0.7));
+  box-shadow: 0 0 28px rgba(232, 184, 106, 0.45);
+  color: #fff8ee;
+}
+
+.dpad.is-dim {
+  opacity: 0.28;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.dpad {
+  transition: opacity 0.2s ease;
+}
+
+#zone-title {
+  position: absolute;
+  left: 50%;
+  top: calc(16% + var(--safe-t));
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font: 800 1.05rem/1.2 system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cream);
+  background: rgba(30, 18, 12, 0.78);
+  border: 1px solid rgba(232, 184, 106, 0.45);
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#zone-title.is-show {
+  animation: zone-toast-in 0.55s ease-out;
+}
+@keyframes zone-toast-in {
+  0% { opacity: 0; transform: translate(-50%, -35%) scale(0.94); }
+  40% { opacity: 1; transform: translate(-50%, -50%) scale(1.03); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (max-width: 420px), (orientation: portrait) and (max-width: 430px) {
+  .sprint-btn { width: 66px; height: 66px; font-size: 0.68rem; }
+  .mini-radar { width: 42px; height: 42px; min-width: 42px; min-height: 42px; }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  .sprint-btn {
+    width: 56px; height: 56px; font-size: 0.62rem;
+    bottom: calc(8px + var(--safe-b) + var(--act) + 6px);
+  }
+  .mini-radar { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+  #zone-title { font-size: 0.85rem; padding: 5px 12px; }
+}
+@media (min-width: 900px) and (pointer: fine) {
+  .sprint-btn { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dpad, .sprint-btn, #zone-title { transition: none !important; animation: none !important; }
+  #zone-title.is-show { animation: none !important; }
 }

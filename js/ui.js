@@ -1,4 +1,4 @@
-/* FRONTEIRA — overlays, HUD, diálogos + wave2/3 meta/tracker/toast/inv */
+/* FRONTEIRA - overlays, HUD, diálogos + wave2/3 meta/tracker/toast/inv */
 export const FronteiraUI = (() => {
   const els = {};
   const META_KEY = 'fronteira-daily-meta-v1';
@@ -20,7 +20,7 @@ export const FronteiraUI = (() => {
     [
       'hud', 'hud-objective', 'hint-bar', 'touch', 'explore-tip', 'juice-fx',
       'quest-toast', 'obj-tracker', 'obj-count', 'compass', 'compass-needle', 'compass-quest',
-      'zone-chip', 'inv-strip', 'obj-dist', 'day-timer', 'win-time',
+      'zone-chip', 'inv-strip', 'obj-dist', 'day-timer', 'win-time', 'radar-blip', 'mini-radar',
       'daily-meta', 'daily-meta-win',
       'screen-menu', 'screen-tip', 'screen-pause', 'screen-dialog', 'screen-win',
       'dialog-name', 'dialog-text', 'btn-dialog-next', 'pause-objective',
@@ -77,12 +77,12 @@ export const FronteiraUI = (() => {
     return `Hoje · zonas ${meta.bestZones}/${ZONE_TOTAL} · falas ${meta.talks}${bestTxt}`;
   }
 
-  /** Wave4 — cronômetro do dia no HUD. */
+  /** Wave4 - cronômetro do dia no HUD. */
   function setDayTimer(sec) {
     if (els['day-timer']) els['day-timer'].textContent = '⏱ ' + fmtTime(sec);
   }
 
-  /** Wave4 — salva melhor tempo; retorna { best, isNew, prev }. */
+  /** Wave4 - salva melhor tempo; retorna { best, isNew, prev }. */
   function recordDayTime(raw) {
     const sec = Math.floor(raw || 0);
     const prev = Math.floor(loadBest());
@@ -93,7 +93,7 @@ export const FronteiraUI = (() => {
     return { best: isNew ? sec : prev, isNew, prev };
   }
 
-  /** Wave4 — distância ao objetivo (m) no HUD. */
+  /** Wave4 - distância ao objetivo (m) no HUD. */
   function setQuestDistance(dist, label) {
     const el = els['obj-dist'];
     if (!el) return;
@@ -103,6 +103,48 @@ export const FronteiraUI = (() => {
     const txt = m <= 2 ? 'aqui' : `${m} m`;
     el.textContent = label ? `${label} · ${txt}` : txt;
     el.classList.toggle('is-near', m <= 6);
+  }
+
+
+  /** Wave5 - mini-radar: blip relativo ao jogador (frente = cima). */
+  function setRadar(relX, relZ, visible, near) {
+    const blip = els['radar-blip'];
+    if (!blip) return;
+    if (!visible) {
+      blip.classList.add('hidden');
+      blip.classList.remove('is-near');
+      return;
+    }
+    blip.classList.remove('hidden');
+    blip.classList.toggle('is-near', !!near);
+    // relX = direita, relZ = frente (já no espaço do jogador, -1..1)
+    const R = 14; // px do centro
+    const x = Math.max(-1, Math.min(1, relX || 0)) * R;
+    const y = Math.max(-1, Math.min(1, -(relZ || 0))) * R; // frente sobe no HUD
+    blip.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  /** Wave5 - toast de zona descoberta (titulo central). */
+  function flashZoneTitle(name) {
+    let el = document.getElementById('zone-title');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'zone-title';
+      const app = document.getElementById('app');
+      if (app) app.appendChild(el);
+    }
+    if (!el || !name) return;
+    el.textContent = name;
+    el.classList.remove('is-show');
+    void el.offsetWidth;
+    el.style.opacity = '1';
+    el.classList.add('is-show');
+    clearTimeout(flashZoneTitle._t);
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    flashZoneTitle._t = setTimeout(() => {
+      el.classList.remove('is-show');
+      el.style.opacity = '0';
+    }, reduced ? 900 : 1600);
   }
 
   function refreshDailyMeta() {
@@ -168,13 +210,13 @@ export const FronteiraUI = (() => {
     if (b) b.classList.toggle('can-use', !!on);
   }
 
-  /** Wave3 — chip de local persistente no HUD. */
+  /** Wave3 - chip de local persistente no HUD. */
   function setZone(name) {
     const el = els['zone-chip'];
     if (el) el.textContent = name || 'Rua Principal';
   }
 
-  /** Wave3 — inventário: itens carregados (encomenda / ferradura / balde). */
+  /** Wave3 - inventário: itens carregados (encomenda / ferradura / balde). */
   function setInventory(flags) {
     const f = flags || {};
     const map = {
@@ -189,7 +231,7 @@ export const FronteiraUI = (() => {
   }
 
   /**
-   * Wave3 — seta dourada na bússola aponta ao objetivo.
+   * Wave3 - seta dourada na bússola aponta ao objetivo.
    * relativeDeg: ângulo em graus (0 = frente do personagem).
    */
   function setQuestArrow(relativeDeg, visible, near) {
@@ -206,7 +248,7 @@ export const FronteiraUI = (() => {
     arrow.style.transform = `translate(-50%, -50%) rotate(${deg}deg) translateY(-15px)`;
   }
 
-  /** Wave3 — vibração curta (Android / Web Vibration). */
+  /** Wave3 - vibração curta (Android / Web Vibration). */
   function haptic(pattern) {
     try {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -245,6 +287,7 @@ export const FronteiraUI = (() => {
     setHint('', false);
     setQuestArrow(0, false);
     setQuestDistance(null);
+    setRadar(0, 0, false);
     setInventory({});
     setZone('Rua Principal');
     refreshDailyMeta();
@@ -374,7 +417,7 @@ export const FronteiraUI = (() => {
     showExploreTip, hideExploreTip, juice, questCompleteFlash,
     setQuestProgress, setCompass, setQuestArrow, setZone, setInventory, haptic,
     recordZoneDiscover, recordTalk, refreshDailyMeta,
-    setDayTimer, recordDayTime, setQuestDistance,
+    setDayTimer, recordDayTime, setQuestDistance, setRadar, flashZoneTitle,
     showDialog, advanceDialog, showWin, updateMuteLabels, on, get els() { return els; },
   };
 })();

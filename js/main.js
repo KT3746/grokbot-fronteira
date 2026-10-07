@@ -1,8 +1,8 @@
-/* FRONTEIRA — boot (ES module) */
-import { FronteiraAudio } from './audio.js?v=202610060540';
-import { FronteiraInput } from './input.js?v=202610060540';
-import { FronteiraUI } from './ui.js?v=202610060540';
-import { FronteiraGame } from './game.js?v=202610060540';
+/* FRONTEIRA - boot (ES module) */
+import { FronteiraAudio } from './audio.js?v=202610070445';
+import { FronteiraInput } from './input.js?v=202610070445';
+import { FronteiraUI } from './ui.js?v=202610070445';
+import { FronteiraGame } from './game.js?v=202610070445';
 
 const canvas = document.getElementById('game');
 FronteiraUI.init();
@@ -76,7 +76,7 @@ function armExploreTip() {
   // Interact (E / button) also dismisses
   const interactWatch = setInterval(() => {
     if (tipSeen) { clearInterval(interactWatch); return; }
-    // consumeInteract is owned by game loop — watch movement + tip tap primarily;
+    // consumeInteract is owned by game loop - watch movement + tip tap primarily;
     // game.js also calls notifyInteract for dismiss.
   }, 500);
 
@@ -101,7 +101,7 @@ FronteiraUI.on('btn-play', 'click', beginPlay);
 FronteiraUI.on('btn-tip-ok', 'click', () => {
   markTipSeen();
   FronteiraGame.start();
-  // tip already seen — no armExploreTip
+  // tip already seen - no armExploreTip
 });
 FronteiraUI.on('btn-pause', 'click', () => {
   if (FronteiraGame.running) {
@@ -123,7 +123,7 @@ FronteiraUI.on('btn-menu', 'click', () => FronteiraGame.stopToMenu());
 FronteiraUI.on('btn-mute', 'click', toggleMute);
 FronteiraUI.on('btn-mute-menu', 'click', toggleMute);
 FronteiraUI.on('btn-dialog-next', 'click', () => FronteiraUI.advanceDialog());
-/* Wave3 — toque em qualquer lugar do diálogo avança (mobile). */
+/* Wave3 - toque em qualquer lugar do diálogo avança (mobile). */
 (() => {
   const dlg = document.getElementById('screen-dialog');
   if (!dlg) return;
