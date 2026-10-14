@@ -248,6 +248,23 @@ export const FronteiraUI = (() => {
     arrow.style.transform = `translate(-50%, -50%) rotate(${deg}deg) translateY(-15px)`;
   }
 
+  /** Onda 6: ficou parado/perdido? aviso amigável + bússola pulsa. */
+  function idleNudge(on) {
+    let el = document.getElementById('idle-nudge');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'idle-nudge';
+      el.className = 'idle-nudge hidden';
+      el.setAttribute('role', 'status');
+      el.textContent = 'Perdido? Siga a seta dourada da bússola ✦';
+      document.body.appendChild(el);
+    }
+    el.classList.toggle('hidden', !on);
+    const arrow = els['compass-quest'];
+    if (arrow) arrow.classList.toggle('is-nudge', !!on);
+    if (on) haptic([15, 60, 15]);
+  }
+
   /** Wave3 - vibração curta (Android / Web Vibration). */
   function haptic(pattern) {
     try {
@@ -323,7 +340,40 @@ export const FronteiraUI = (() => {
     show('screen-dialog');
   }
 
+  /* Onda 6: texto do diálogo aparece letra por letra; toque completa a frase. */
+  let typeTimer = 0;
+  let typeFull = '';
+  function typeLine(line) {
+    const el = els['dialog-text'];
+    if (!el) return;
+    clearInterval(typeTimer);
+    typeFull = line;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || line.length < 4) { el.textContent = line; typeFull = ''; return; }
+    let i = 0;
+    el.textContent = '';
+    el.classList.add('is-typing');
+    typeTimer = setInterval(() => {
+      i += 2;
+      el.textContent = line.slice(0, i);
+      if (i >= line.length) {
+        clearInterval(typeTimer);
+        typeFull = '';
+        el.classList.remove('is-typing');
+      }
+    }, 22);
+  }
+
   function advanceDialog() {
+    if (typeFull) {
+      clearInterval(typeTimer);
+      if (els['dialog-text']) {
+        els['dialog-text'].textContent = typeFull;
+        els['dialog-text'].classList.remove('is-typing');
+      }
+      typeFull = '';
+      return true;
+    }
     if (!dialogQueue.length) {
       hide('screen-dialog');
       const cb = onDialogDone;
@@ -332,7 +382,7 @@ export const FronteiraUI = (() => {
       return false;
     }
     const line = dialogQueue.shift();
-    if (els['dialog-text']) els['dialog-text'].textContent = line;
+    typeLine(line);
     if (els['btn-dialog-next']) {
       els['btn-dialog-next'].textContent = dialogQueue.length ? 'Continuar' : 'Fechar';
     }
@@ -348,6 +398,21 @@ export const FronteiraUI = (() => {
       else if (rec && rec.best) txt += ` · recorde ${fmtTime(rec.best)}`;
       wt.textContent = txt;
       wt.classList.toggle('is-record', !!(rec && rec.isNew));
+    }
+    // Onda 6: medalha do dia pelo tempo (ouro < 4 min, prata < 7 min, bronze)
+    let medal = document.getElementById('win-medal');
+    if (!medal && wt) {
+      medal = document.createElement('div');
+      medal.id = 'win-medal';
+      wt.before(medal);
+    }
+    if (medal) {
+      const kind = sec < 240 ? 'ouro' : sec < 420 ? 'prata' : 'bronze';
+      const label = kind === 'ouro' ? 'Medalha de Ouro' : kind === 'prata' ? 'Medalha de Prata' : 'Medalha de Bronze';
+      const next = kind === 'bronze' ? 'Prata: menos de 7:00' : kind === 'prata' ? 'Ouro: menos de 4:00' : 'Dia de mestre!';
+      medal.className = `win-medal is-${kind}`;
+      medal.innerHTML = `<span class="win-medal__disc">★</span><b>${label}</b><small>${next}</small>`;
+      haptic(kind === 'ouro' ? [20, 40, 20, 40, 40] : [20, 40, 30]);
     }
     refreshDailyMeta();
     show('screen-win');
@@ -418,6 +483,6 @@ export const FronteiraUI = (() => {
     setQuestProgress, setCompass, setQuestArrow, setZone, setInventory, haptic,
     recordZoneDiscover, recordTalk, refreshDailyMeta,
     setDayTimer, recordDayTime, setQuestDistance, setRadar, flashZoneTitle,
-    showDialog, advanceDialog, showWin, updateMuteLabels, on, get els() { return els; },
+    showDialog, advanceDialog, showWin, idleNudge, updateMuteLabels, on, get els() { return els; },
   };
 })();
