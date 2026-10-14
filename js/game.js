@@ -1,9 +1,9 @@
 /* FRONTEIRA - Three.js 3ª pessoa baixo-poli (canyon street) - visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610070445';
-import { FronteiraWorld } from './world.js?v=202610070445';
-import { FronteiraInput } from './input.js?v=202610070445';
-import { FronteiraUI } from './ui.js?v=202610070445';
+import { FronteiraAudio } from './audio.js?v=202610142255';
+import { FronteiraWorld } from './world.js?v=202610142255';
+import { FronteiraInput } from './input.js?v=202610142255';
+import { FronteiraUI } from './ui.js?v=202610142255';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -210,6 +210,7 @@ export const FronteiraGame = (() => {
     if (won) return;
     if (countDone() >= 3) {
       won = true; running = false;
+      FronteiraUI.idleNudge(false);
       FronteiraAudio.questDone();
       if (beacon) beacon.visible = false;
       FronteiraUI.setQuestDistance(null);
@@ -1209,6 +1210,8 @@ export const FronteiraGame = (() => {
     ensureZoneEl();
   }
 
+  let idleT = 0;
+  let idleNudged = false;
   function frame() {
     /* Aba/app oculta: não simula nem renderiza (dt efetivo = 0). */
     if (document.hidden) {
@@ -1223,7 +1226,15 @@ export const FronteiraGame = (() => {
         const dialogOpen = !document.getElementById('screen-dialog').classList.contains('hidden');
         dayTime += dt;
         if (!dialogOpen) {
+          const px0 = player.x, pz0 = player.z;
           move(dt);
+          if (Math.abs(player.x - px0) + Math.abs(player.z - pz0) > 0.002) {
+            if (idleNudged) { idleNudged = false; FronteiraUI.idleNudge(false); }
+            idleT = 0;
+          } else if (!idleNudged) {
+            idleT += dt;
+            if (idleT > 18) { idleNudged = true; FronteiraUI.idleNudge(true); }
+          }
           updateNear();
           updateZone(dt);
           if (FronteiraInput.consumeInteract()) tryInteract();
@@ -1288,6 +1299,7 @@ export const FronteiraGame = (() => {
   }
 
   function start() {
+    idleT = 0; idleNudged = false; FronteiraUI.idleNudge(false);
     spawn();
     running = true; paused = false; won = false;
     FronteiraUI.hideOverlays();
@@ -1304,6 +1316,7 @@ export const FronteiraGame = (() => {
   }
 
   function pause() {
+    idleT = 0; idleNudged = false; FronteiraUI.idleNudge(false);
     if (!running || won) return;
     if (paused) {
       FronteiraUI.showPause();
@@ -1323,6 +1336,7 @@ export const FronteiraGame = (() => {
     clock.getDelta();
   }
   function stopToMenu() {
+    idleT = 0; idleNudged = false; FronteiraUI.idleNudge(false);
     running = false; paused = false; won = false;
     if (beacon) beacon.visible = false;
     FronteiraUI.showMenu();
