@@ -330,7 +330,7 @@ html, body {
   .dpad { bottom: calc(6px + var(--safe-b)); gap: 4px; left: calc(6px + var(--safe-l)); }
   .interact-btn { bottom: calc(8px + var(--safe-b)); font-size: 0.72rem; }
   .panel { padding: 14px 14px 12px; max-height: min(92dvh, 360px); overflow: auto; }
-  .logo { font-size: clamp(1.8rem, 8vw, 2.4rem); margin-bottom: 4px; }
+  .logo { font-size: clamp(1.5rem, 7.5vw, 2.3rem); margin-bottom: 4px; }
   .btn { min-height: 44px; padding: 10px 14px; }
 }
 
@@ -369,9 +369,12 @@ html, body {
   margin-bottom: 8px;
 }
 .logo {
-  font-size: clamp(2rem, 11vw, 2.8rem);
+  font-size: clamp(1.55rem, 8.2vw, 2.6rem);
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: clamp(0.06em, 0.9vw, 0.2em);
+  margin-right: calc(-1 * clamp(0.06em, 0.9vw, 0.2em));
+  max-width: 100%;
+  white-space: nowrap;
   color: var(--ochre);
   text-shadow: 0 0 24px rgba(196, 165, 116, 0.35);
   margin-bottom: 8px;
