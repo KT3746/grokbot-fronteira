@@ -1,8 +1,14 @@
+## Onda 7
+
+- Dica flutuante ao chegar perto de alguém (**Falar com…**)
+- Chip **Correndo!** ao segurar o sprint
+- Cronômetro avisa depois de 4 minutos
+
 # FRONTEIRA
 
 Poeira, madeira e gente dura na beira do mapa. Explore um povoado de sertão a pé: fale com a gente, entregue encomendas, ache o que se perdeu e deixe o dia passar.
 
-**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202610142255
+**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202611091248
 
 ## Como jogar
 
@@ -60,13 +66,13 @@ Câmera em **terceira pessoa** (chase cam) com **Three.js / WebGL** baixo-poli: 
 - Joystick analógico flutuante: arraste o dedo na metade esquerda (velocidade proporcional), D-pad continua
 - Baliza dourada 3D flutuando sobre o próximo objetivo + chip de distância (ex.: "Seu Zé · 22 m")
 - Cronômetro do dia no HUD + recorde de melhor dia (tela final e menu)
-- Cache-bust `?v=202610060540`
+- Cache-bust `?v=202611091248`
 
 ### Wave 5
 - Mini-radar no HUD: blip do próximo objetivo relativo ao jogador (frente = cima)
 - Botão **Correr** (hold) no toque + Shift no teclado; D-pad some quando o joystick está ativo
 - Poeira nos pés ao andar + bob leve da câmera; céu/névoa entardece com o cronômetro
-- Toast de zona descoberta + cache-bust `?v=202610142255`
+- Toast de zona descoberta + cache-bust `?v=202611091248`
 
 Jogo **original** - sem personagens ou marcas licenciadas.
 

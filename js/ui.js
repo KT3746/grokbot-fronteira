@@ -79,7 +79,10 @@ export const FronteiraUI = (() => {
 
   /** Wave4 - cronômetro do dia no HUD. */
   function setDayTimer(sec) {
-    if (els['day-timer']) els['day-timer'].textContent = '⏱ ' + fmtTime(sec);
+    if (!els['day-timer']) return;
+    els['day-timer'].textContent = '⏱ ' + fmtTime(sec);
+    // Onda 7: após 4 min (limite ouro) o cronômetro avisa
+    els['day-timer'].classList.toggle('is-late', (sec || 0) >= 240);
   }
 
   /** Wave4 - salva melhor tempo; retorna { best, isNew, prev }. */
@@ -205,9 +208,41 @@ export const FronteiraUI = (() => {
       bar.classList.add('hidden');
     }
   }
-  function setInteractReady(on) {
+  function setInteractReady(on, label) {
     const b = els['btn-interact'];
-    if (b) b.classList.toggle('can-use', !!on);
+    if (b) {
+      b.classList.toggle('can-use', !!on);
+      // Onda 7: rótulo curto no botão quando há alguém perto
+      if (on && label) b.setAttribute('data-near', label);
+      else b.removeAttribute('data-near');
+    }
+    let tip = document.getElementById('interact-tip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'interact-tip';
+      tip.className = 'interact-tip hidden';
+      tip.setAttribute('role', 'status');
+      document.body.appendChild(tip);
+    }
+    if (on && label) {
+      tip.textContent = label;
+      tip.classList.remove('hidden');
+    } else {
+      tip.classList.add('hidden');
+    }
+  }
+
+  /** Onda 7: chip "Correndo!" enquanto segura o sprint. */
+  function setSprinting(on) {
+    let el = document.getElementById('sprint-chip');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sprint-chip';
+      el.className = 'sprint-chip hidden';
+      el.textContent = 'Correndo!';
+      document.body.appendChild(el);
+    }
+    el.classList.toggle('hidden', !on);
   }
 
   /** Wave3 - chip de local persistente no HUD. */
@@ -478,7 +513,7 @@ export const FronteiraUI = (() => {
 
   return {
     init, show, hide, setHudVisible, setTouchVisible, setObjective, setHint,
-    setInteractReady, showMenu, showTip, hideOverlays, showPause, hidePause,
+    setInteractReady, setSprinting, showMenu, showTip, hideOverlays, showPause, hidePause,
     showExploreTip, hideExploreTip, juice, questCompleteFlash,
     setQuestProgress, setCompass, setQuestArrow, setZone, setInventory, haptic,
     recordZoneDiscover, recordTalk, refreshDailyMeta,
