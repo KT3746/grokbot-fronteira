@@ -948,3 +948,72 @@ html, body {
 @keyframes fr-nudge { 50% { transform: translateX(-50%) translateY(-4px); } }
 .is-nudge { filter: drop-shadow(0 0 8px #ffd34d); animation: fr-caret .5s steps(1) infinite; }
 @media (prefers-reduced-motion: reduce) { .win-medal, .idle-nudge, .is-nudge, .is-typing::after { animation: none; } }
+
+/* ===== Wave 7: tip de interação, Correndo!, cronômetro tarde ===== */
+.interact-tip {
+  position: fixed;
+  left: 50%;
+  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(12, 18, 12, 0.82);
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  color: #f5e6b8;
+  font-weight: 700;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.interact-tip.hidden { display: none; }
+.interact-btn.can-use {
+  animation: interact-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.65), 0 0 18px rgba(212, 175, 55, 0.35);
+}
+.interact-btn.can-use::after {
+  content: attr(data-near);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f5e6b8;
+  text-shadow: 0 1px 2px #000;
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sprint-chip {
+  position: fixed;
+  top: calc(72px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  z-index: 35;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(40, 90, 40, 0.85);
+  border: 1px solid rgba(120, 220, 120, 0.5);
+  color: #d7ffd7;
+  font-weight: 800;
+  font-size: 0.78rem;
+  pointer-events: none;
+}
+.sprint-chip.hidden { display: none; }
+.day-timer.is-late {
+  color: #ffd28a;
+  box-shadow: 0 0 12px rgba(255, 180, 80, 0.35);
+  animation: late-pulse 1.2s ease-in-out infinite;
+}
+@keyframes late-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .interact-btn.can-use, .day-timer.is-late { animation: none; }
+}
+@media (max-width: 819px) {
+  .interact-tip { bottom: calc(132px + env(safe-area-inset-bottom, 0px)); font-size: 0.8rem; }
+}

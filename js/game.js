@@ -1,9 +1,9 @@
 /* FRONTEIRA - Three.js 3ª pessoa baixo-poli (canyon street) - visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202610142255';
-import { FronteiraWorld } from './world.js?v=202610142255';
-import { FronteiraInput } from './input.js?v=202610142255';
-import { FronteiraUI } from './ui.js?v=202610142255';
+import { FronteiraAudio } from './audio.js?v=202611091248';
+import { FronteiraWorld } from './world.js?v=202611091248';
+import { FronteiraInput } from './input.js?v=202611091248';
+import { FronteiraUI } from './ui.js?v=202611091248';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -366,12 +366,18 @@ export const FronteiraGame = (() => {
   function updateNear() {
     near = FronteiraWorld.nearInteract(player.x, player.z, 2.2);
     let hint = '';
+    let nearLabel = '';
     if (near) {
-      if (near.type === 'npc') hint = near.ref.name + ' · Interagir';
-      else hint = (near.ref.hint || 'Interagir') + ' · Interagir';
+      if (near.type === 'npc') {
+        hint = near.ref.name + ' · Interagir';
+        nearLabel = 'Falar com ' + near.ref.name;
+      } else {
+        hint = (near.ref.hint || 'Interagir') + ' · Interagir';
+        nearLabel = near.ref.hint || 'Interagir';
+      }
     }
     FronteiraUI.setHint(hint, !!near);
-    FronteiraUI.setInteractReady(!!near);
+    FronteiraUI.setInteractReady(!!near, nearLabel);
     if (near && !nearWas) {
       const now = performance.now();
       if (now - hapticNearAt > 450) {
@@ -1237,6 +1243,11 @@ export const FronteiraGame = (() => {
           }
           updateNear();
           updateZone(dt);
+          // Onda 7: chip Correndo enquanto segura Correr
+          try {
+            const sprinting = !!(FronteiraInput.isSprinting && FronteiraInput.isSprinting());
+            FronteiraUI.setSprinting(sprinting && player.moving);
+          } catch (_) { /* ok */ }
           if (FronteiraInput.consumeInteract()) tryInteract();
         } else if (FronteiraInput.consumeInteract()) {
           FronteiraUI.advanceDialog();
