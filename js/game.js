@@ -1,9 +1,9 @@
 /* FRONTEIRA - Three.js 3ª pessoa baixo-poli (canyon street) - visual premium */
 import * as THREE from 'three';
-import { FronteiraAudio } from './audio.js?v=202611091248';
-import { FronteiraWorld } from './world.js?v=202611091248';
-import { FronteiraInput } from './input.js?v=202611091248';
-import { FronteiraUI } from './ui.js?v=202611091248';
+import { FronteiraAudio } from './audio.js?v=202611130045';
+import { FronteiraWorld } from './world.js?v=202611130045';
+import { FronteiraInput } from './input.js?v=202611130045';
+import { FronteiraUI } from './ui.js?v=202611130045';
 
 export const FronteiraGame = (() => {
   const PLAYER_R = 0.55;
@@ -32,6 +32,9 @@ export const FronteiraGame = (() => {
   let isLowEnd = false;
   let player = { x: 0, z: 0, ang: 0, moving: false };
   let camPos, lookPos, _tmp;
+  /* Onda 8: paredes/toldos que a câmera não atravessa */
+  const camBlockers = [];
+  let camRay = null, _head = null, _dir = null;
   let windowTex = null;
   let roadMat, dirtMat, asphaltMat;
   let wagonGroup;
@@ -78,13 +81,13 @@ export const FronteiraGame = (() => {
     const f = state.flags, qd = state.questDone;
     const npc = (id) => {
       const n = FronteiraWorld.npcs.find((x) => x.id === id);
-      return n ? { x: n.x, z: n.z, label: n.name, npc: true } : null;
+      return n ? { x: n.x, z: n.z, label: n.name, npc: true, ref: n } : null;
     };
     const spot = (id) => {
       const s = FronteiraWorld.interactables.find((x) => x.id === id);
       if (!s || (s.kind === 'item' && s.collected)) return null;
       const label = id === 'poco' ? 'Poço' : (id === 'ferradura' ? 'Ferradura' : (s.hint || ''));
-      return { x: s.x + (s.w || 0) * 0.5, z: s.z + (s.d || 0) * 0.5, label, npc: false };
+      return { x: s.x + (s.w || 0) * 0.5, z: s.z + (s.d || 0) * 0.5, label, npc: false, ref: s };
     };
     if (!qd.entrega) {
       if (!f.talkedZe) return npc('seu_ze');
@@ -365,6 +368,15 @@ export const FronteiraGame = (() => {
 
   function updateNear() {
     near = FronteiraWorld.nearInteract(player.x, player.z, 2.2);
+    /* Onda 8: o objetivo atual ganha a vez — no poço, Interagir enche o balde em vez de puxar conversa com a Rita. */
+    const tgt = state ? questTargetPos() : null;
+    if (near && tgt && tgt.ref && near.ref !== tgt.ref) {
+      const pr = 2.2;
+      const pb = { x: player.x - pr, z: player.z - pr, w: pr * 2, d: pr * 2 };
+      const r = tgt.ref;
+      const rb = tgt.npc ? { x: r.x - 1.2, z: r.z - 1.2, w: 2.4, d: 2.4 } : { x: r.x, z: r.z, w: r.w, d: r.d };
+      if (FronteiraWorld.aabbOverlap(pb, rb)) near = { type: tgt.npc ? 'npc' : 'spot', ref: r };
+    }
     let hint = '';
     let nearLabel = '';
     if (near) {
@@ -632,6 +644,14 @@ export const FronteiraGame = (() => {
     return g;
   }
 
+  /** Onda 8: registra o corpo da carroça (caixa alinhada; rotação ~90° troca largura/fundo). */
+  function solidWagon(g) {
+    const r = Math.abs(Math.sin(g.rotation.y));
+    const w = 2.4 * (1 - r) + 3.6 * r;
+    const d = 3.6 * (1 - r) + 2.4 * r;
+    FronteiraWorld.addProp(g.position.x, g.position.z, w * 0.92, d * 0.92);
+  }
+
   function makeWagon() {
     const g = new THREE.Group();
     const wood = woodMat(0x5c3d2e);
@@ -725,6 +745,7 @@ export const FronteiraGame = (() => {
     const roof = boxMesh(w + 0.5, 0.38, d + 0.5, topMat, true, false);
     roof.position.set(x + w / 2, h + 0.18, z + d / 2);
     group.add(mesh, roof);
+    camBlockers.push(mesh);
 
     // wood baseboard trim
     const base = boxMesh(w + 0.15, 0.35, d + 0.15, trimMat, true, true);
@@ -771,6 +792,7 @@ export const FronteiraGame = (() => {
         // skip
       } else {
         group.add(awn);
+        camBlockers.push(awn);
         // thin support poles
         const poleL = boxMesh(0.1, doorH * 0.55, 0.1, trimMat, true, false);
         const poleR = poleL.clone();
@@ -850,10 +872,12 @@ export const FronteiraGame = (() => {
     w3.position.set(-6.2, 0, 72);
     w3.rotation.y = 0.35;
     scene.add(w3);
+    solidWagon(w3);
     const w4 = makeWagon();
     w4.position.set(6.0, 0, 130);
     w4.rotation.y = Math.PI * 0.48;
     scene.add(w4);
+    solidWagon(w4);
 
     // barrels near landmarks / sidewalks (visual only - no collider)
     const barrelSpots = [
@@ -959,10 +983,12 @@ export const FronteiraGame = (() => {
     wagonGroup.position.set(5.5, 0, 40);
     wagonGroup.rotation.y = Math.PI * 0.5;
     scene.add(wagonGroup);
+    solidWagon(wagonGroup);
     const wagon2 = makeWagon();
     wagon2.position.set(-5.2, 0, 100);
     wagon2.rotation.y = -0.2;
     scene.add(wagon2);
+    solidWagon(wagon2);
 
     placeProps();
 
@@ -1186,7 +1212,26 @@ export const FronteiraGame = (() => {
       CAM_HEIGHT + bobY,
       player.z - c * CAM_DIST
     );
-    const k = 1 - Math.exp(-(reducedMotion ? 8 : 5.5) * dt);
+    let k = 1 - Math.exp(-(reducedMotion ? 8 : 5.5) * dt);
+    /* Onda 8: se parede ou toldo fica entre o vaqueiro e a câmera, ela chega mais perto em vez de atravessar. */
+    if (camBlockers.length) {
+      if (!camRay) { camRay = new THREE.Raycaster(); _head = new THREE.Vector3(); _dir = new THREE.Vector3(); }
+      _head.set(player.x, 1.8, player.z);
+      _dir.subVectors(desired, _head);
+      const full = _dir.length();
+      if (full > 0.01) {
+        _dir.multiplyScalar(1 / full);
+        camRay.set(_head, _dir);
+        camRay.far = full + 0.4;
+        const hit = camRay.intersectObjects(camBlockers, false)[0];
+        if (hit) {
+          const d = Math.max(1.3, hit.distance - 0.45);
+          desired.copy(_head).addScaledVector(_dir, d);
+          desired.y = Math.max(desired.y, 2.2);
+          k = Math.max(k, 0.6);
+        }
+      }
+    }
     camPos.lerp(desired, k);
     lookPos.set(
       player.x + s * LOOK_AHEAD,
