@@ -72,7 +72,8 @@ export const FronteiraWorld = (() => {
     { id: 'door_estabulo', x: -10, z: 2, w: 4, d: 4, kind: 'npc_link', npc: 'tiao', hint: 'Estábulo do Tião' },
     { id: 'door_capela', x: 0, z: 152, w: 5, d: 4, kind: 'npc_link', npc: 'padre_elias', hint: 'Capela' },
     { id: 'poco', x: -0.5, z: 81, w: 5, d: 5, kind: 'well', hint: 'Poço da praça' },
-    { id: 'ferradura', x: -18, z: -18, w: 3, d: 3, kind: 'item', item: 'ferradura', hint: 'Algo brilha no mato…', collected: false },
+    /* Onda 8: ferradura no fim da rua, junto do mato — antes caía dentro de um prédio do cânion (sem caminho visível) */
+    { id: 'ferradura', x: -5.5, z: -21, w: 3, d: 3, kind: 'item', item: 'ferradura', hint: 'Algo brilha no mato…', collected: false },
   ];
 
   const npcs = [
@@ -99,7 +100,8 @@ export const FronteiraWorld = (() => {
       },
     },
     {
-      id: 'tiao', name: 'Tião', x: -12, z: 4,
+      /* Onda 8: Tião na porta do estábulo (antes ficava dentro da parede, invisível) */
+      id: 'tiao', name: 'Tião', x: -7.6, z: 4,
       shirt: 0x5a5840, pants: 0x2c2c22, skin: 0xb89068, hat: 0x4a3828,
       place: 'Estábulo',
       lines: {
@@ -152,7 +154,16 @@ export const FronteiraWorld = (() => {
       const s = solids[i];
       if (aabbOverlap(box, { x: s.x, z: s.z, w: s.w, d: s.d })) return true;
     }
+    for (let i = 0; i < props.length; i++) {
+      if (aabbOverlap(box, props[i])) return true;
+    }
     return false;
+  }
+
+  /* Onda 8: carroças têm corpo — não dá mais pra atravessar. */
+  const props = [];
+  function addProp(x, z, w, d) {
+    props.push({ x: x - w / 2, z: z - d / 2, w, d });
   }
 
   function nearInteract(px, pz, pr) {
@@ -192,6 +203,6 @@ export const FronteiraWorld = (() => {
 
   return {
     ROAD_HALF, solids, canyon, interactables, npcs, quests, spawn, bounds,
-    collides, nearInteract, resetItems, zoneAt, aabbOverlap,
+    collides, nearInteract, resetItems, zoneAt, aabbOverlap, addProp, props,
   };
 })();

@@ -1,3 +1,11 @@
+## Onda 8
+
+- **Tião aparece**: ele ficava dentro da parede do estábulo (invisível, e a baliza apontava pro muro). Agora espera na porta.
+- **Ferradura alcançável**: caía dentro de um prédio do cânion, sem caminho visível. Agora fica no fim da rua, junto do mato ao sul.
+- **Interagir faz o que o objetivo pede**: no poço, o botão enche o balde em vez de puxar conversa com a Rita (antes dava pra ficar preso falando com ela).
+- **Câmera não atravessa paredes nem toldos**: chega mais perto quando um prédio fica entre você e ela.
+- **Carroças têm corpo**: não dá mais pra atravessar.
+
 ## Onda 7
 
 - Dica flutuante ao chegar perto de alguém (**Falar com…**)
@@ -8,7 +16,7 @@
 
 Poeira, madeira e gente dura na beira do mapa. Explore um povoado de sertão a pé: fale com a gente, entregue encomendas, ache o que se perdeu e deixe o dia passar.
 
-**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202611091248
+**Jogar:** https://kt3746.github.io/grokbot-fronteira/?v=202611130045
 
 ## Como jogar
 
@@ -66,13 +74,13 @@ Câmera em **terceira pessoa** (chase cam) com **Three.js / WebGL** baixo-poli: 
 - Joystick analógico flutuante: arraste o dedo na metade esquerda (velocidade proporcional), D-pad continua
 - Baliza dourada 3D flutuando sobre o próximo objetivo + chip de distância (ex.: "Seu Zé · 22 m")
 - Cronômetro do dia no HUD + recorde de melhor dia (tela final e menu)
-- Cache-bust `?v=202611091248`
+- Cache-bust `?v=202611130045`
 
 ### Wave 5
 - Mini-radar no HUD: blip do próximo objetivo relativo ao jogador (frente = cima)
 - Botão **Correr** (hold) no toque + Shift no teclado; D-pad some quando o joystick está ativo
 - Poeira nos pés ao andar + bob leve da câmera; céu/névoa entardece com o cronômetro
-- Toast de zona descoberta + cache-bust `?v=202611091248`
+- Toast de zona descoberta + cache-bust `?v=202611130045`
 
 Jogo **original** - sem personagens ou marcas licenciadas.
 
